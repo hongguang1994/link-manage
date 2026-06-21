@@ -1,0 +1,25 @@
+version: '3.9'
+
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/sim_manager.db
+    # 必须使用 host network 才能访问 ModemManager D-Bus
+    network_mode: host
+    privileged: true   # 访问 /dev/ttyUSB* 设备
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend

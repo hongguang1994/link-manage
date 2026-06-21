@@ -1,0 +1,23 @@
+from pydantic_settings import BaseSettings
+from typing import List
+
+
+class Settings(BaseSettings):
+    APP_NAME: str = "SIM Manager"
+    DEBUG: bool = False
+    DATABASE_URL: str = "sqlite:///./sim_manager.db"
+    SECRET_KEY: str = "change-me-in-production"
+
+    # ModemManager polling interval (seconds)
+    MODEM_POLL_INTERVAL: int = 10
+
+    # SMS scheduler check interval (seconds)
+    SMS_SCHEDULER_INTERVAL: int = 30
+
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()

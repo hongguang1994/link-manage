@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sshpass -p root ssh -o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no root@10.211.55.6 ' *)",
+      "Bash(curl -s http://10.211.55.6/api/health)",
+      "Bash(curl -s http://10.211.55.6/api/modems/)"
+    ]
+  }
+}

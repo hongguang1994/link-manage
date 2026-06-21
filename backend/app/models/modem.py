@@ -1,0 +1,34 @@
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum
+from sqlalchemy.orm import relationship
+from datetime import datetime
+import enum
+from app.core.database import Base
+
+
+class ModemStatus(str, enum.Enum):
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
+    ERROR = "error"
+    UNKNOWN = "unknown"
+
+
+class Modem(Base):
+    __tablename__ = "modems"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_path = Column(String(100), unique=True, nullable=False)  # e.g. /dev/ttyUSB0
+    mm_object_path = Column(String(200))                            # ModemManager D-Bus path
+    imei = Column(String(20), unique=True)
+    manufacturer = Column(String(100))
+    model = Column(String(100))
+    phone_number = Column(String(30))
+    operator = Column(String(100))
+    signal_quality = Column(Integer, default=0)
+    status = Column(Enum(ModemStatus), default=ModemStatus.UNKNOWN)
+    alias = Column(String(100))
+    is_active = Column(Boolean, default=True)
+    last_seen = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    sms_messages = relationship("SmsMessage", back_populates="modem")
+    scheduled_tasks = relationship("SmsScheduledTask", back_populates="modem")

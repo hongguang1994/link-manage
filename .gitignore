@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.db
+*.db-shm
+*.db-wal
+.env
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# Claude
+.claude/settings.local.json
