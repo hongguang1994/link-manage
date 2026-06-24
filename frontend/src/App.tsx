@@ -13,6 +13,7 @@ import AdminTasks from './pages/AdminTasks'
 import Templates from './pages/Templates'
 import SimRequests from './pages/SimRequests'
 import MyRequests from './pages/MyRequests'
+import ResourceLibrary from './pages/ResourceLibrary'
 import Login from './pages/Login'
 import { useAuthStore } from './store/authStore'
 
@@ -34,6 +35,12 @@ function RequireSupport({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function RequireApprove({ children }: { children: React.ReactNode }) {
+  const canApprove = useAuthStore(s => s.canApprove)
+  if (!canApprove()) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -49,10 +56,11 @@ export default function App() {
           <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
           <Route path="/roles" element={<RequireAdmin><Roles /></RequireAdmin>} />
           <Route path="/support" element={<RequireSupport><SupportAdmin /></RequireSupport>} />
-          <Route path="/admin/tasks" element={<RequireAdmin><AdminTasks /></RequireAdmin>} />
+          <Route path="/admin/tasks" element={<AdminTasks />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/my-requests" element={<MyRequests />} />
-          <Route path="/admin/sim-requests" element={<RequireAdmin><SimRequests /></RequireAdmin>} />
+          <Route path="/resources" element={<ResourceLibrary />} />
+          <Route path="/admin/sim-requests" element={<RequireApprove><SimRequests /></RequireApprove>} />
         </Route>
       </Routes>
     </BrowserRouter>

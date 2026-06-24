@@ -6,11 +6,11 @@ import { useLangStore } from '../store/langStore'
 
 // ── System role i18n map ──────────────────────────────────────────────────────
 const SYSTEM_ROLE_I18N: Record<string, { name: string; description: string }> = {
-  '全功能用户':  { name: 'Full Access',       description: 'Access to all features, no device restrictions' },
-  '只读用户':   { name: 'Read-only User',     description: 'View only, no write operations' },
-  '短信操作员': { name: 'SMS Operator',       description: 'Send SMS and view history, cannot manage tasks' },
-  '任务管理员': { name: 'Task Manager',       description: 'Manage scheduled tasks and view history' },
-  '客服':       { name: 'Customer Support',   description: 'Reply to user support chats, no other admin access' },
+  '审批员':   { name: 'Approver',       description: 'View SIM cards, approve requests, view history' },
+  '普通用户': { name: 'Regular User',   description: 'View authorized SIM cards only' },
+  '只读用户': { name: 'Read-only User', description: 'View only, no write operations' },
+  '客服':     { name: 'Support Staff',  description: 'Handle support chats, view SIM cards' },
+  '访客':     { name: 'Guest',          description: 'No permissions, admin must assign roles' },
 }
 
 function roleLabel(role: RoleOut, lang: string) {
@@ -39,7 +39,7 @@ function PermRow({ label, checked, onChange, disabled }: {
 // ── Role form modal ───────────────────────────────────────────────────────────
 const EMPTY_FORM: RoleCreate = {
   name: '', description: '',
-  can_view_sim: true, can_send_sms: true, can_manage_tasks: true, can_view_history: true,
+  can_view_sim: false, can_approve_requests: false, can_view_history: false,
   read_only: false, can_support: false, allowed_modem_ids: null,
 }
 
@@ -50,8 +50,8 @@ function RoleModal({ role, onClose, onSaved, lang }: {
   const [form, setForm] = useState<RoleCreate>(
     role ? {
       name: role.name, description: role.description,
-      can_view_sim: role.can_view_sim, can_send_sms: role.can_send_sms,
-      can_manage_tasks: role.can_manage_tasks, can_view_history: role.can_view_history,
+      can_view_sim: role.can_view_sim, can_approve_requests: role.can_approve_requests,
+      can_view_history: role.can_view_history,
       read_only: role.read_only, can_support: role.can_support, allowed_modem_ids: role.allowed_modem_ids,
     } : EMPTY_FORM
   )
@@ -111,8 +111,7 @@ function RoleModal({ role, onClose, onSaved, lang }: {
           <div className="bg-gray-750 border border-gray-700 rounded-lg px-4 py-1">
             <PermRow label={zh ? '只读模式（禁止所有写操作）' : 'Read-only (no write)'} checked={form.read_only} onChange={v => set('read_only', v)} />
             <PermRow label={zh ? '查看 SIM 卡' : 'View SIM cards'} checked={form.can_view_sim} onChange={v => set('can_view_sim', v)} />
-            <PermRow label={zh ? '发送短信' : 'Send SMS'} checked={form.can_send_sms} onChange={v => set('can_send_sms', v)} disabled={form.read_only} />
-            <PermRow label={zh ? '管理定时任务' : 'Manage tasks'} checked={form.can_manage_tasks} onChange={v => set('can_manage_tasks', v)} disabled={form.read_only} />
+            <PermRow label={zh ? '审批 SIM 卡申请' : 'Approve SIM requests'} checked={!!form.can_approve_requests} onChange={v => set('can_approve_requests', v)} disabled={form.read_only} />
             <PermRow label={zh ? '查看短信记录' : 'View SMS history'} checked={form.can_view_history} onChange={v => set('can_view_history', v)} />
             <PermRow label={zh ? '回复用户咨询（客服权限）' : 'Reply to support chats'} checked={!!form.can_support} onChange={v => set('can_support', v)} />
           </div>
@@ -140,9 +139,8 @@ function RoleCard({ role, onEdit, onDelete, lang }: {
   const zh = lang === 'zh'
   const { name: displayName, description: displayDesc } = roleLabel(role, lang)
   const perms = [
-    { label: zh ? '查看 SIM' : 'View SIM', on: role.can_view_sim },
-    { label: zh ? '发送短信' : 'Send SMS', on: role.can_send_sms },
-    { label: zh ? '管理任务' : 'Tasks', on: role.can_manage_tasks },
+    { label: zh ? '查看SIM' : 'View SIM', on: role.can_view_sim },
+    { label: zh ? '审批申请' : 'Approve', on: role.can_approve_requests },
     { label: zh ? '查看记录' : 'History', on: role.can_view_history },
     { label: zh ? '客服' : 'Support', on: role.can_support },
   ]

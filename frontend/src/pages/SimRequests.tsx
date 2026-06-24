@@ -3,7 +3,7 @@ import { CheckCircle, XCircle, Clock, RefreshCw, CheckCheck, X, Calendar } from 
 import clsx from 'clsx'
 import {
   listSimRequestsApi, approveSimRequestApi, rejectSimRequestApi, batchApproveApi,
-  type SimAccessRequest,
+  type SimAccessRequest, type PermissionLevel,
 } from '../api/simRequests'
 
 type FilterStatus = 'pending' | 'approved' | 'rejected' | ''
@@ -37,6 +37,7 @@ function ApproveModal({
   const [permanent, setPermanent] = useState(true)
   const [expiresAt, setExpiresAt] = useState('')
   const [adminNote, setAdminNote] = useState('')
+  const [grantedLevel, setGrantedLevel] = useState<PermissionLevel>('use')
   const [loading, setLoading] = useState(false)
 
   const submit = async () => {
@@ -44,9 +45,9 @@ function ApproveModal({
     try {
       const exp = permanent ? null : (expiresAt ? new Date(expiresAt).toISOString() : null)
       if (items.length === 1) {
-        await approveSimRequestApi(items[0].id, exp, adminNote || undefined)
+        await approveSimRequestApi(items[0].id, exp, adminNote || undefined, grantedLevel)
       } else {
-        await batchApproveApi(items.map(i => i.id), exp, adminNote || undefined)
+        await batchApproveApi(items.map(i => i.id), exp, adminNote || undefined, grantedLevel)
       }
       onDone()
       onClose()
@@ -79,6 +80,28 @@ function ApproveModal({
         {items.length > 3 && (
           <p className="text-sm text-gray-300">共 {items.length} 条申请将被批准</p>
         )}
+
+        <div>
+          <p className="text-sm text-gray-400 mb-2">授权级别</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setGrantedLevel('use')}
+              className={clsx('flex-1 py-2 rounded-lg text-sm border transition-colors', grantedLevel === 'use'
+                ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                : 'border-gray-600 text-gray-400 hover:border-gray-500')}
+            >
+              使用（可发短信）
+            </button>
+            <button
+              onClick={() => setGrantedLevel('view')}
+              className={clsx('flex-1 py-2 rounded-lg text-sm border transition-colors', grantedLevel === 'view'
+                ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                : 'border-gray-600 text-gray-400 hover:border-gray-500')}
+            >
+              仅查看
+            </button>
+          </div>
+        </div>
 
         <div>
           <p className="text-sm text-gray-400 mb-2">有效期</p>
@@ -310,6 +333,7 @@ export default function SimRequests() {
                 </th>
                 <th className="px-4 py-3 text-left">用户</th>
                 <th className="px-4 py-3 text-left">申请设备</th>
+                <th className="px-4 py-3 text-left">申请级别</th>
                 <th className="px-4 py-3 text-left">申请理由</th>
                 <th className="px-4 py-3 text-left">状态</th>
                 <th className="px-4 py-3 text-left">有效期</th>
@@ -330,6 +354,15 @@ export default function SimRequests() {
                   </td>
                   <td className="px-4 py-3 font-medium text-white">{r.username}</td>
                   <td className="px-4 py-3 text-gray-200">{r.modem_name}</td>
+                  <td className="px-4 py-3">
+                    <span className={clsx('text-xs px-2 py-0.5 rounded-full', r.requested_level === 'use'
+                      ? 'bg-blue-900/40 text-blue-300' : 'bg-gray-700 text-gray-400')}>
+                      {r.requested_level === 'use' ? '使用' : '查看'}
+                      {r.granted_level && r.granted_level !== r.requested_level && (
+                        <span className="ml-1 text-yellow-400">→{r.granted_level === 'use' ? '使用' : '查看'}</span>
+                      )}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-gray-400 max-w-xs truncate">{r.reason || '—'}</td>
                   <td className="px-4 py-3"><StatusBadge status={r.status} isExpired={r.is_expired} /></td>
                   <td className="px-4 py-3 text-gray-300 text-xs">

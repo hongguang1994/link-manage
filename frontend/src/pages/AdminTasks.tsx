@@ -12,6 +12,7 @@ import {
 } from '../api/sms'
 import { listUsersApi, type UserOut } from '../api/auth'
 import { useLangStore } from '../store/langStore'
+import { useAuthStore } from '../store/authStore'
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
@@ -189,6 +190,8 @@ function TaskRow({
 
 export default function AdminTasks() {
   const lang = useLangStore(s => s.lang)
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
   const [stats, setStats] = useState<TaskStats | null>(null)
   const [users, setUsers] = useState<UserOut[]>([])
@@ -209,7 +212,7 @@ export default function AdminTasks() {
   }, [filterStatus, filterUser])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { listUsersApi().then(r => setUsers(r.data)) }, [])
+  useEffect(() => { if (isAdmin) listUsersApi().then(r => setUsers(r.data)) }, [isAdmin])
 
   const filtered = tasks.filter(t =>
     !search || t.name.toLowerCase().includes(search.toLowerCase())
@@ -224,7 +227,7 @@ export default function AdminTasks() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Activity className="w-6 h-6 text-blue-400" />
-          {zh ? '定时任务监控' : 'Task Monitor'}
+          {isAdmin ? (zh ? '定时任务监控' : 'Task Monitor') : (zh ? '我的任务记录' : 'My Tasks')}
         </h1>
         <button onClick={load} className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors">
           <RefreshCw className="w-4 h-4" /> {zh ? '刷新' : 'Refresh'}
@@ -266,14 +269,16 @@ export default function AdminTasks() {
           <option value="failed">{zh ? '失败' : 'Failed'}</option>
         </select>
 
-        <select
-          value={filterUser}
-          onChange={e => setFilterUser(e.target.value ? Number(e.target.value) : '')}
-          className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white"
-        >
-          <option value="">{zh ? '全部用户' : 'All users'}</option>
-          {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
-        </select>
+        {isAdmin && (
+          <select
+            value={filterUser}
+            onChange={e => setFilterUser(e.target.value ? Number(e.target.value) : '')}
+            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white"
+          >
+            <option value="">{zh ? '全部用户' : 'All users'}</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
+          </select>
+        )}
 
         <div className="flex items-center gap-1.5 text-xs text-gray-500 ml-auto">
           <Users className="w-3.5 h-3.5" />

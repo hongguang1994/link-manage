@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.models import user, permission, support, notification  # ensure tables are created
+from app.models import user, support, notification  # ensure tables are created
 from app.models import role as role_model  # ensure roles table is created
 from app.models import sim_request as sim_request_model  # ensure sim_access_requests table is created
 from app.api import modems, sms

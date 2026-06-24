@@ -5,7 +5,8 @@ from typing import List
 from datetime import datetime, date
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, _perm, get_user_modem_grants
+from app.models.user import UserRole
 from app.models.modem import Modem
 from app.models.sms import SmsMessage, SmsDirection
 from app.schemas.modem import ModemOut, ModemUpdate, ModemDetail
@@ -14,13 +15,48 @@ from app.services import modem_manager
 router = APIRouter(prefix="/modems", tags=["modems"], dependencies=[Depends(get_current_user)])
 
 
-@router.get("/", response_model=List[ModemOut])
-def list_modems(db: Session = Depends(get_db)):
+def _visible_modem_ids(user, db: Session):
+    """Return list of modem IDs visible to this user, or None for unrestricted (admin)."""
+    if user.role == UserRole.ADMIN:
+        return None
+    p = _perm(user)
+    if not p or not p.get("can_view_sim"):
+        raise HTTPException(status_code=403, detail="无SIM卡查看权限")
+    # Modems user has any approved grant for (approver-managed cards included automatically)
+    granted = get_user_modem_grants(user.id, db, user=user)
+    # Intersect with role's allowed_modem_ids if restricted (skip for approvers — their scope is already their managed set)
+    p2 = _perm(user)
+    role_scope = p2.get("allowed_modem_ids") if p2 and not p2.get("can_approve_requests") else None
+    if role_scope is not None:
+        granted = [m for m in granted if m in role_scope]
+    return granted
+
+
+@router.get("/available", response_model=List[ModemOut])
+def list_available_modems(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    """All modems visible for apply purposes — any authenticated user with can_view_sim."""
+    p = _perm(current_user)
+    if current_user.role != UserRole.ADMIN and (not p or not p.get("can_view_sim")):
+        raise HTTPException(status_code=403, detail="无SIM卡查看权限")
     return db.query(Modem).order_by(Modem.id).all()
 
 
+@router.get("/", response_model=List[ModemOut])
+def list_modems(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.role == UserRole.ADMIN:
+        return db.query(Modem).order_by(Modem.id).all()
+    visible = _visible_modem_ids(current_user, db)
+    if not visible:
+        return []
+    return db.query(Modem).filter(Modem.id.in_(visible)).order_by(Modem.id).all()
+
+
 @router.get("/{modem_id}", response_model=ModemOut)
-def get_modem(modem_id: int, db: Session = Depends(get_db)):
+def get_modem(modem_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.role != UserRole.ADMIN:
+        visible = _visible_modem_ids(current_user, db)
+        if visible is not None and modem_id not in visible:
+            raise HTTPException(status_code=403, detail="无权访问该设备")
     modem = db.query(Modem).filter(Modem.id == modem_id).first()
     if not modem:
         raise HTTPException(status_code=404, detail="Modem not found")
@@ -40,7 +76,11 @@ def update_modem(modem_id: int, data: ModemUpdate, db: Session = Depends(get_db)
 
 
 @router.get("/{modem_id}/detail", response_model=ModemDetail)
-def get_modem_detail(modem_id: int, db: Session = Depends(get_db)):
+def get_modem_detail(modem_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    if current_user.role != UserRole.ADMIN:
+        visible = _visible_modem_ids(current_user, db)
+        if visible is not None and modem_id not in visible:
+            raise HTTPException(status_code=403, detail="无权访问该设备")
     modem = db.query(Modem).filter(Modem.id == modem_id).first()
     if not modem:
         raise HTTPException(status_code=404, detail="Modem not found")
@@ -71,7 +111,6 @@ def get_modem_detail(modem_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{modem_id}/refresh", response_model=ModemOut)
 def refresh_modem(modem_id: int, db: Session = Depends(get_db)):
-    """Force refresh modem info from ModemManager."""
     modem = db.query(Modem).filter(Modem.id == modem_id).first()
     if not modem or not modem.mm_object_path:
         raise HTTPException(status_code=404, detail="Modem not found")

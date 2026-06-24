@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Send, Clock, MessageSquare, Cpu, CreditCard,
   Users, LogOut, Sun, Moon, Monitor, ChevronDown, User, KeyRound, X, ShieldCheck,
   Wifi, RefreshCw, ArrowUp, MessageCircle, PanelLeftClose, PanelLeftOpen,
-  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText, ClipboardList, ClipboardCheck,
+  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText, ClipboardCheck, Database,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useModemStore } from '../store/modemStore'
@@ -152,14 +152,18 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
                   user?.role === 'admin' ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-600/50 text-gray-400'
                 )}>
                   <ShieldCheck className="w-3 h-3" />
-                  {user?.role === 'admin' ? t('nav_admin') : t('nav_user')}
+                  {user?.role === 'admin'
+                    ? t('nav_admin')
+                    : user?.rbac_roles?.length
+                    ? user.rbac_roles.map((r: any) => r.name).join(' · ')
+                    : t('nav_user')}
                 </span>
               </div>
 
               <div className="bg-gray-900/60 rounded-xl overflow-hidden">
                 {[
                   { label: lang === 'zh' ? '用户名' : 'Username', value: user?.username },
-                  { label: lang === 'zh' ? '账号角色' : 'Role', value: user?.role === 'admin' ? t('nav_admin') : t('nav_user') },
+                  { label: lang === 'zh' ? '账号角色' : 'Role', value: user?.role === 'admin' ? t('nav_admin') : user?.rbac_roles?.length ? user.rbac_roles.map((r: any) => r.name).join(' · ') : t('nav_user') },
                   { label: lang === 'zh' ? '账号状态' : 'Status', value: user?.is_active ? (lang === 'zh' ? '正常' : 'Active') : (lang === 'zh' ? '已禁用' : 'Disabled') },
                   { label: lang === 'zh' ? '注册时间' : 'Created', value: user?.created_at ? fmtDate(user.created_at) : '—' },
                 ].map(({ label, value }, i) => (
@@ -243,7 +247,7 @@ function FloatBtn({ icon: Icon, label, onClick, color = 'text-blue-400', badge }
 export default function Layout() {
   useModemSocket()
   const modems = useModemStore(s => s.modems)
-  const { user, clearAuth, perm, canSupport, setAuth, token } = useAuthStore()
+  const { user, clearAuth, perm, canSupport, canApprove, setAuth, token } = useAuthStore()
   const p = perm()
 
   // Refresh user info on mount so that role/permission changes take effect without re-login
@@ -331,14 +335,23 @@ export default function Layout() {
   const currentThemeOpt = THEME_OPTS.find(o => o.mode === mode)!
 
   const navLinkCls = ({ isActive }: { isActive: boolean }) =>
-    clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
+    clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
       sideCollapsed && 'justify-center px-0',
-      isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-700/60')
+      isActive ? 'nav-active' : 'text-gray-400 hover:text-blue-200 hover:bg-blue-500/10')
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: '#020c1b' }}>
+      {/* Ambient background orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden>
+        <div className="animate-orb absolute w-[600px] h-[600px] rounded-full opacity-30"
+          style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.35) 0%, transparent 70%)', top: '-150px', left: '-100px' }} />
+        <div className="animate-orb-2 absolute w-[500px] h-[500px] rounded-full opacity-20"
+          style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%)', bottom: '-100px', right: '-100px' }} />
+        <div className="animate-orb-3 absolute w-[400px] h-[400px] rounded-full opacity-15"
+          style={{ background: 'radial-gradient(circle, rgba(6,182,212,0.3) 0%, transparent 70%)', top: '40%', right: '25%' }} />
+      </div>
       {/* Top header */}
-      <header className="sidebar-bg bg-gray-800 border-b border-gray-700 h-14 flex items-center px-6 shrink-0 sticky top-0 z-40">
+      <header className="glass-strong border-b border-blue-500/10 h-14 flex items-center px-6 shrink-0 sticky top-0 z-40">
         <div className="flex items-center gap-2 w-48 shrink-0">
           <button
             onClick={() => setSideCollapsed(c => !c)}
@@ -470,7 +483,11 @@ export default function Layout() {
               <div className="hidden sm:block text-left">
                 <p className="text-sm font-medium text-white leading-none">{user?.username}</p>
                 <p className="text-xs text-gray-500 leading-none mt-0.5">
-                  {user?.role === 'admin' ? t('nav_admin') : t('nav_user')}
+                  {user?.role === 'admin'
+                    ? t('nav_admin')
+                    : user?.rbac_roles?.length
+                    ? user.rbac_roles.map((r: any) => r.name).join(' · ')
+                    : t('nav_user')}
                 </p>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
@@ -485,7 +502,11 @@ export default function Layout() {
                 <div>
                   <p className="text-sm font-medium text-white">{user?.username}</p>
                   <p className="text-xs text-gray-400">
-                    {user?.role === 'admin' ? t('nav_admin') : t('nav_user')}
+                    {user?.role === 'admin'
+                      ? t('nav_admin')
+                      : user?.rbac_roles?.length
+                      ? user.rbac_roles.map((r: any) => r.name).join(' · ')
+                      : t('nav_user')}
                   </p>
                 </div>
               </div>
@@ -517,7 +538,7 @@ export default function Layout() {
       {/* Body */}
       <div className="flex flex-1 min-h-0">
         <aside className={clsx(
-          'sidebar-bg bg-gray-800 border-r border-gray-700 flex flex-col py-4 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto overflow-x-hidden transition-all duration-200',
+          'glass-strong border-r border-blue-500/10 flex flex-col py-4 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto overflow-x-hidden transition-all duration-200',
           sideCollapsed ? 'w-14 px-1' : 'w-52 px-2'
         )}>
           <nav className="space-y-0.5 flex-1">
@@ -526,30 +547,34 @@ export default function Layout() {
               {!sideCollapsed && <span>{t('nav_overview')}</span>}
             </NavLink>
             {p.can_view_sim && (
+              <NavLink to="/resources" className={navLinkCls} title={sideCollapsed ? '资源库' : undefined}>
+                <Database className="w-4 h-4 shrink-0" />
+                {!sideCollapsed && <span>{lang === 'zh' ? '资源库' : 'Resources'}</span>}
+              </NavLink>
+            )}
+            {p.can_view_sim && (
               <NavLink to="/sim-cards" className={navLinkCls} title={sideCollapsed ? t('nav_sim') : undefined}>
                 <CreditCard className="w-4 h-4 shrink-0" />
                 {!sideCollapsed && <span>{t('nav_sim')}</span>}
               </NavLink>
             )}
-            {p.can_send_sms && (
+            {!p.read_only && (
               <NavLink to="/send" className={navLinkCls} title={sideCollapsed ? t('nav_send') : undefined}>
                 <Send className="w-4 h-4 shrink-0" />
                 {!sideCollapsed && <span>{t('nav_send')}</span>}
               </NavLink>
             )}
-            {p.can_send_sms && (
+            {!p.read_only && (
               <NavLink to="/templates" className={navLinkCls} title={sideCollapsed ? '短信模板' : undefined}>
                 <FileText className="w-4 h-4 shrink-0" />
                 {!sideCollapsed && <span>{lang === 'zh' ? '短信模板' : 'Templates'}</span>}
               </NavLink>
             )}
-            {p.can_view_history && (
-              <NavLink to="/history" className={navLinkCls} title={sideCollapsed ? t('nav_history') : undefined}>
-                <MessageSquare className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{t('nav_history')}</span>}
-              </NavLink>
-            )}
-            {p.can_manage_tasks && (
+            <NavLink to="/history" className={navLinkCls} title={sideCollapsed ? t('nav_history') : undefined}>
+              <MessageSquare className="w-4 h-4 shrink-0" />
+              {!sideCollapsed && <span>{t('nav_history')}</span>}
+            </NavLink>
+            {!p.read_only && (
               <NavLink to="/tasks" className={navLinkCls} title={sideCollapsed ? t('nav_tasks') : undefined}>
                 <Clock className="w-4 h-4 shrink-0" />
                 {!sideCollapsed && <span>{t('nav_tasks')}</span>}
@@ -567,22 +592,16 @@ export default function Layout() {
                 {!sideCollapsed && <span>{lang === 'zh' ? '角色管理' : 'Roles'}</span>}
               </NavLink>
             )}
-            {user?.role === 'admin' && (
+            {(user?.role === 'admin' || !p.read_only) && (
               <NavLink to="/admin/tasks" className={navLinkCls} title={sideCollapsed ? t('nav_admin_tasks') : undefined}>
                 <Activity className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{t('nav_admin_tasks')}</span>}
+                {!sideCollapsed && <span>{user?.role === 'admin' ? t('nav_admin_tasks') : (lang === 'zh' ? '我的任务记录' : 'My Tasks')}</span>}
               </NavLink>
             )}
-            {user?.role === 'admin' && (
+            {canApprove() && (
               <NavLink to="/admin/sim-requests" className={navLinkCls} title={sideCollapsed ? 'SIM申请审批' : undefined}>
                 <ClipboardCheck className="w-4 h-4 shrink-0" />
                 {!sideCollapsed && <span>{lang === 'zh' ? 'SIM申请审批' : 'SIM Requests'}</span>}
-              </NavLink>
-            )}
-            {user?.role !== 'admin' && (
-              <NavLink to="/my-requests" className={navLinkCls} title={sideCollapsed ? '我的申请' : undefined}>
-                <ClipboardList className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{lang === 'zh' ? '我的SIM权限' : 'My SIM Access'}</span>}
               </NavLink>
             )}
             {canSupport() && (

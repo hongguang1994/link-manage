@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, KeyRound, ShieldCheck, ShieldOff, RefreshCw, X, Check, Settings2, UserCog } from 'lucide-react'
+import { Plus, Trash2, KeyRound, ShieldCheck, ShieldOff, RefreshCw, X, Check, UserCog } from 'lucide-react'
 import clsx from 'clsx'
 import {
   listUsersApi, createUserApi, updateUserApi, deleteUserApi,
-  resetPasswordApi, changePasswordApi, getPermissionsApi, updatePermissionsApi,
-  type UserOut, type PermissionOut,
+  resetPasswordApi, changePasswordApi,
+  type UserOut,
 } from '../api/auth'
 import { listRolesApi, setUserRolesApi, type RoleOut } from '../api/roles'
 
 const ROLE_NAME_EN: Record<string, string> = {
-  '全功能用户': 'Full Access', '只读用户': 'Read-only User',
-  '短信操作员': 'SMS Operator', '任务管理员': 'Task Manager', '客服': 'Customer Support',
+  '审批员': 'Approver', '普通用户': 'Regular User', '只读用户': 'Read-only User',
+  '客服': 'Support Staff', '访客': 'Guest',
 }
 const roleDisplayName = (role: RoleOut, lang: string) =>
   (lang !== 'zh' && role.is_system && ROLE_NAME_EN[role.name]) ? ROLE_NAME_EN[role.name] : role.name
-import { getModemsApi, type Modem } from '../api/modems'
 import { useAuthStore } from '../store/authStore'
 import { useT } from '../i18n'
 import { useLangStore } from '../store/langStore'
@@ -23,7 +22,6 @@ type Modal =
   | { type: 'create' }
   | { type: 'reset_pwd'; user: UserOut }
   | { type: 'change_pwd' }
-  | { type: 'permissions'; user: UserOut }
   | { type: 'assign_role'; user: UserOut }
   | null
 
@@ -37,23 +35,12 @@ const RoleBadge = ({ role, t }: { role: string; t: ReturnType<typeof useT> }) =>
   </span>
 )
 
-const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
-  <label className="flex items-center justify-between py-2 border-b border-gray-700/50 last:border-0 cursor-pointer">
-    <span className="text-sm text-gray-300">{label}</span>
-    <button type="button"
-      onClick={() => onChange(!checked)}
-      className={clsx('w-10 h-5 rounded-full transition-colors relative flex-shrink-0', checked ? 'bg-blue-600' : 'bg-gray-600')}>
-      <span className={clsx('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all', checked ? 'left-5' : 'left-0.5')} />
-    </button>
-  </label>
-)
 
 export default function Users() {
   const { user: me } = useAuthStore()
   const t = useT()
   const lang = useLangStore(s => s.lang)
   const [users, setUsers] = useState<UserOut[]>([])
-  const [modems, setModems] = useState<Modem[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<Modal>(null)
   const [err, setErr] = useState('')
@@ -67,19 +54,9 @@ export default function Users() {
   const [roles, setRoles] = useState<RoleOut[]>([])
   const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([])
 
-  const [perm, setPerm] = useState<PermissionOut>({
-    can_view_sim: true, can_send_sms: true,
-    can_manage_tasks: true, can_view_history: true,
-    read_only: false, allowed_modem_ids: null,
-  })
-  const [allModems, setAllModems] = useState(true)
-
   const load = () => {
     setLoading(true)
-    Promise.all([
-      listUsersApi().then(r => setUsers(r.data)),
-      getModemsApi().then(r => setModems(r.data)),
-    ]).finally(() => setLoading(false))
+    listUsersApi().then(r => setUsers(r.data)).finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
@@ -105,14 +82,6 @@ export default function Users() {
 
   const toggleRoleId = (id: number) =>
     setSelectedRoleIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
-
-  const openPermissions = async (u: UserOut) => {
-    const res = await getPermissionsApi(u.id)
-    const p = res.data
-    setPerm(p)
-    setAllModems(p.allowed_modem_ids === null)
-    setModal({ type: 'permissions', user: u })
-  }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('')
@@ -152,27 +121,6 @@ export default function Users() {
     catch (e: any) { setErr(e.response?.data?.detail || t('change_fail')) }
   }
 
-  const handleSavePerm = async (e: React.FormEvent) => {
-    e.preventDefault(); setErr('')
-    if (modal?.type !== 'permissions') return
-    try {
-      const payload: PermissionOut = {
-        ...perm,
-        allowed_modem_ids: allModems ? null : (perm.allowed_modem_ids ?? []),
-      }
-      await updatePermissionsApi(modal.user.id, payload)
-      load(); closeModal()
-    } catch (e: any) { setErr(e.response?.data?.detail || t('users_save_fail')) }
-  }
-
-  const toggleModem = (id: number) => {
-    const cur = perm.allowed_modem_ids ?? []
-    setPerm(p => ({
-      ...p,
-      allowed_modem_ids: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id],
-    }))
-  }
-
   const inputCls = "w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
   const labelCls = "block text-xs text-gray-400 mb-1"
 
@@ -181,7 +129,6 @@ export default function Users() {
     if (modal.type === 'create') return t('create_user_title')
     if (modal.type === 'reset_pwd') return `${t('reset_pwd_title')} — ${(modal as any).user.username}`
     if (modal.type === 'change_pwd') return t('change_pwd_title')
-    if (modal.type === 'permissions') return `${t('users_perms_title')} — ${(modal as any).user.username}`
     if (modal.type === 'assign_role') return `${lang === 'zh' ? '分配角色' : 'Assign Role'} — ${(modal as any).user.username}`
     return ''
   }
@@ -247,16 +194,12 @@ export default function Users() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      {u.role === 'user' && u.id !== me?.id && (<>
+                      {u.role === 'user' && u.id !== me?.id && (
                         <button onClick={() => openAssignRole(u)} title={lang === 'zh' ? '分配角色' : 'Assign Role'}
                           className="p-1.5 text-gray-400 hover:text-indigo-400 hover:bg-gray-700 rounded transition-colors">
                           <UserCog className="w-4 h-4" />
                         </button>
-                        <button onClick={() => openPermissions(u)} title={t('users_perms_title')}
-                          className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-gray-700 rounded transition-colors">
-                          <Settings2 className="w-4 h-4" />
-                        </button>
-                      </>)}
+                      )}
                       {u.id !== me?.id && (<>
                         <button onClick={() => handleToggleRole(u)}
                           title={u.role === 'admin' ? t('users_role_user') : t('users_role_admin')}
@@ -288,10 +231,7 @@ export default function Users() {
 
       {modal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className={clsx(
-            'bg-gray-800 border border-gray-700 rounded-2xl p-6 shadow-2xl w-full',
-            modal.type === 'permissions' ? 'max-w-md' : 'max-w-sm'
-          )}>
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-white">{modalTitle()}</h2>
               <button onClick={closeModal} className="text-gray-500 hover:text-gray-300"><X className="w-5 h-5" /></button>
@@ -339,39 +279,6 @@ export default function Users() {
               </form>
             )}
 
-            {modal.type === 'permissions' && (
-              <form onSubmit={handleSavePerm} className="space-y-5">
-                <div>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">{t('users_perms_ops')}</p>
-                  <div className="bg-gray-900/50 rounded-lg px-3">
-                    <Toggle checked={!perm.read_only} onChange={v => setPerm(p => ({ ...p, read_only: !v }))} label={t('users_perms_read_only')} />
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">{t('users_perms_modules')}</p>
-                  <div className="bg-gray-900/50 rounded-lg px-3">
-                    <Toggle checked={perm.can_view_sim} onChange={v => setPerm(p => ({ ...p, can_view_sim: v }))} label={t('users_perm_view_sim')} />
-                    <Toggle checked={perm.can_view_history} onChange={v => setPerm(p => ({ ...p, can_view_history: v }))} label={t('users_perm_history')} />
-                  </div>
-                </div>
-
-                <div className="bg-blue-900/20 border border-blue-500/20 rounded-lg px-4 py-3">
-                  <p className="text-xs text-blue-300 font-medium mb-1">
-                    {lang === 'zh' ? 'SIM卡使用权限' : 'SIM Card Access'}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {lang === 'zh'
-                      ? '发短信、定时任务等使用权限须由用户在「SIM卡」页面申请，管理员在「SIM申请审批」页面审批后自动生效。'
-                      : 'SMS sending and task management access must be applied by users and approved via SIM Requests.'}
-                  </p>
-                </div>
-
-                {err && <p className="text-red-400 text-xs">{err}</p>}
-                <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-2 text-sm font-medium transition-colors">{t('users_save_perms')}</button>
-              </form>
-            )}
-
             {modal.type === 'assign_role' && (
               <div className="space-y-4">
                 <p className="text-xs text-gray-400">
@@ -399,8 +306,7 @@ export default function Users() {
                           <div className="flex gap-1 mt-1.5 flex-wrap">
                             {[
                               { label: lang === 'zh' ? '查看SIM' : 'SIM', on: r.can_view_sim },
-                              { label: lang === 'zh' ? '发短信' : 'SMS', on: r.can_send_sms },
-                              { label: lang === 'zh' ? '管理任务' : 'Tasks', on: r.can_manage_tasks },
+                              { label: lang === 'zh' ? '审批申请' : 'Approve', on: r.can_approve_requests },
                               { label: lang === 'zh' ? '查看记录' : 'History', on: r.can_view_history },
                             ].map(p => (
                               <span key={p.label} className={clsx('text-[10px] px-1.5 py-0.5 rounded-full',
@@ -423,8 +329,7 @@ export default function Users() {
                       <div className="flex gap-1.5 flex-wrap">
                         {[
                           { label: lang === 'zh' ? '查看SIM' : 'View SIM', on: sel.some(r => r.can_view_sim) },
-                          { label: lang === 'zh' ? '发短信' : 'SMS', on: sel.some(r => r.can_send_sms) },
-                          { label: lang === 'zh' ? '管理任务' : 'Tasks', on: sel.some(r => r.can_manage_tasks) },
+                          { label: lang === 'zh' ? '审批申请' : 'Approve', on: sel.some(r => r.can_approve_requests) },
                           { label: lang === 'zh' ? '查看记录' : 'History', on: sel.some(r => r.can_view_history) },
                           { label: lang === 'zh' ? '客服' : 'Support', on: sel.some(r => r.can_support) },
                         ].map(p => (

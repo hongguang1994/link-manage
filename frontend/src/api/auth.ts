@@ -1,22 +1,12 @@
 import api from './client'
 
-export interface PermissionOut {
-  can_view_sim: boolean
-  can_send_sms: boolean
-  can_manage_tasks: boolean
-  can_view_history: boolean
-  read_only: boolean
-  allowed_modem_ids: number[] | null
-}
-
 export interface RoleOut {
   id: number
   name: string
   description: string
   is_system: boolean
   can_view_sim: boolean
-  can_send_sms: boolean
-  can_manage_tasks: boolean
+  can_approve_requests: boolean
   can_view_history: boolean
   read_only: boolean
   can_support: boolean
@@ -32,7 +22,6 @@ export interface UserOut {
   is_active: boolean
   created_at: string
   updated_at: string
-  permission?: PermissionOut | null
   rbac_roles?: RoleOut[]
 }
 
@@ -64,8 +53,3 @@ export const resetPasswordApi = (id: number, new_password: string) =>
   api.post<UserOut>(`/users/${id}/reset-password`, { new_password })
 export const changePasswordApi = (old_password: string, new_password: string) =>
   api.post('/users/me/change-password', { old_password, new_password })
-
-export const getPermissionsApi = (id: number) =>
-  api.get<PermissionOut>(`/users/${id}/permissions`)
-export const updatePermissionsApi = (id: number, data: PermissionOut) =>
-  api.put<PermissionOut>(`/users/${id}/permissions`, data)

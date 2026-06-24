@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckCircle, XCircle, Clock, RefreshCw, Plus, X, Calendar } from 'lucide-react'
 import clsx from 'clsx'
-import { mySimRequestsApi, createSimRequestApi, type SimAccessRequest } from '../api/simRequests'
-import { getModemsApi, type Modem } from '../api/modems'
-import { useAuthStore } from '../store/authStore'
+import { mySimRequestsApi, createSimRequestApi, type SimAccessRequest, type PermissionLevel } from '../api/simRequests'
+import { getAvailableModemsApi, type Modem } from '../api/modems'
 
 function StatusBadge({ status, isExpired }: { status: string; isExpired: boolean }) {
   if (status === 'approved' && isExpired) {
@@ -33,13 +33,13 @@ function ApplyModal({
   onClose: () => void
   onDone: () => void
 }) {
-  const perm = useAuthStore(s => s.perm)()
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [reason, setReason] = useState('')
+  const [requestedLevel, setRequestedLevel] = useState<PermissionLevel>('use')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Determine which modems to show: exclude those already accessible or pending
+  // Determine which modems to show: exclude those already approved or pending
   const pendingIds = new Set(existingRequests.filter(r => r.status === 'pending').map(r => r.modem_id))
   const now = new Date()
   const approvedIds = new Set(
@@ -48,15 +48,7 @@ function ApplyModal({
       .map(r => r.modem_id)
   )
 
-  const availableModems = modems.filter(m => {
-    // Already has access via RBAC/permission
-    if (!perm.allowed_modem_ids || perm.allowed_modem_ids.includes(m.id)) {
-      if (perm.can_send_sms) return false
-    }
-    // Already approved
-    if (approvedIds.has(m.id)) return false
-    return true
-  })
+  const availableModems = modems.filter(m => !approvedIds.has(m.id))
 
   const toggle = (id: number) => {
     const next = new Set(selected)
@@ -69,7 +61,7 @@ function ApplyModal({
     setLoading(true)
     setError('')
     try {
-      await Promise.all([...selected].map(id => createSimRequestApi(id, reason || undefined)))
+      await Promise.all([...selected].map(id => createSimRequestApi(id, reason || undefined, requestedLevel)))
       onDone()
       onClose()
     } catch (e: any) {
@@ -79,8 +71,8 @@ function ApplyModal({
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center" style={{ zIndex: 9999 }} onClick={onClose}>
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">申请SIM卡使用权限</h2>
@@ -127,6 +119,28 @@ function ApplyModal({
         </div>
 
         <div>
+          <p className="text-sm text-gray-400 mb-2">申请权限级别</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setRequestedLevel('use')}
+              className={clsx('flex-1 py-2 rounded-lg text-sm border transition-colors', requestedLevel === 'use'
+                ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                : 'border-gray-600 text-gray-400 hover:border-gray-500')}
+            >
+              使用（发短信/定时任务）
+            </button>
+            <button
+              onClick={() => setRequestedLevel('view')}
+              className={clsx('flex-1 py-2 rounded-lg text-sm border transition-colors', requestedLevel === 'view'
+                ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                : 'border-gray-600 text-gray-400 hover:border-gray-500')}
+            >
+              仅查看
+            </button>
+          </div>
+        </div>
+
+        <div>
           <label className="block text-sm text-gray-400 mb-1">申请理由（可选）</label>
           <textarea
             value={reason}
@@ -150,7 +164,8 @@ function ApplyModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -163,7 +178,7 @@ export default function MyRequests() {
   const load = async () => {
     setLoading(true)
     try {
-      const [reqRes, modemRes] = await Promise.all([mySimRequestsApi(), getModemsApi()])
+      const [reqRes, modemRes] = await Promise.all([mySimRequestsApi(), getAvailableModemsApi()])
       setRequests(reqRes.data)
       setModems(modemRes.data)
     } finally {
@@ -216,6 +231,11 @@ export default function MyRequests() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-white">{r.modem_name}</span>
                     <StatusBadge status={r.status} isExpired={r.is_expired} />
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">
+                      {r.status === 'approved' && r.granted_level
+                        ? (r.granted_level === 'use' ? '已授权使用' : '已授权查看')
+                        : (r.requested_level === 'use' ? '申请使用' : '申请查看')}
+                    </span>
                   </div>
                   {r.reason && <p className="text-sm text-gray-400">申请理由：{r.reason}</p>}
                   {r.admin_note && (

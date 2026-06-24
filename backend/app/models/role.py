@@ -9,13 +9,12 @@ class Role(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(64), unique=True, nullable=False)
     description = Column(Text, default="")
-    is_system = Column(Boolean, default=False)   # system roles cannot be deleted
+    is_system = Column(Boolean, default=False)
 
     # Feature permissions
-    can_view_sim      = Column(Boolean, default=True)
-    can_send_sms      = Column(Boolean, default=True)
-    can_manage_tasks  = Column(Boolean, default=True)
-    can_view_history  = Column(Boolean, default=True)
+    can_view_sim         = Column(Boolean, default=False)
+    can_approve_requests = Column(Boolean, default=False)
+    can_view_history     = Column(Boolean, default=False)
 
     # Operation type
     read_only = Column(Boolean, default=False)

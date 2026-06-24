@@ -1,5 +1,7 @@
 import client from './client'
 
+export type PermissionLevel = 'view' | 'use'
+
 export interface SimAccessRequest {
   id: number
   user_id: number
@@ -13,10 +15,12 @@ export interface SimAccessRequest {
   created_at: string | null
   updated_at: string | null
   is_expired: boolean
+  requested_level: PermissionLevel
+  granted_level: PermissionLevel | null
 }
 
-export const createSimRequestApi = (modem_id: number, reason?: string) =>
-  client.post<SimAccessRequest>('/sim-requests/', { modem_id, reason })
+export const createSimRequestApi = (modem_id: number, reason?: string, requested_level: PermissionLevel = 'use') =>
+  client.post<SimAccessRequest>('/sim-requests/', { modem_id, reason, requested_level })
 
 export const mySimRequestsApi = () =>
   client.get<SimAccessRequest[]>('/sim-requests/my')
@@ -24,11 +28,11 @@ export const mySimRequestsApi = () =>
 export const listSimRequestsApi = (status?: string) =>
   client.get<SimAccessRequest[]>('/sim-requests/', { params: status ? { status } : {} })
 
-export const approveSimRequestApi = (id: number, expires_at?: string | null, admin_note?: string) =>
-  client.put(`/sim-requests/${id}/approve`, { expires_at: expires_at ?? null, admin_note })
+export const approveSimRequestApi = (id: number, expires_at?: string | null, admin_note?: string, granted_level: PermissionLevel = 'use') =>
+  client.put(`/sim-requests/${id}/approve`, { expires_at: expires_at ?? null, admin_note, granted_level })
 
 export const rejectSimRequestApi = (id: number, admin_note?: string) =>
   client.put(`/sim-requests/${id}/reject`, { admin_note })
 
-export const batchApproveApi = (ids: number[], expires_at?: string | null, admin_note?: string) =>
-  client.post('/sim-requests/batch-approve', { ids, expires_at: expires_at ?? null, admin_note })
+export const batchApproveApi = (ids: number[], expires_at?: string | null, admin_note?: string, granted_level: PermissionLevel = 'use') =>
+  client.post('/sim-requests/batch-approve', { ids, expires_at: expires_at ?? null, admin_note, granted_level })

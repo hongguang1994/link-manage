@@ -7,8 +7,7 @@ export interface RoleCreate {
   name: string
   description?: string
   can_view_sim: boolean
-  can_send_sms: boolean
-  can_manage_tasks: boolean
+  can_approve_requests: boolean
   can_view_history: boolean
   read_only: boolean
   can_support: boolean

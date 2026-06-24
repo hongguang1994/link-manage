@@ -1,11 +1,29 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { UserOut, PermissionOut } from '../api/auth'
+import type { UserOut } from '../api/auth'
 
-const FULL_PERM: PermissionOut = {
-  can_view_sim: true, can_send_sms: true,
-  can_manage_tasks: true, can_view_history: true,
-  read_only: false, allowed_modem_ids: null,
+export interface EffectivePerm {
+  can_view_sim: boolean
+  can_approve_requests: boolean
+  can_view_history: boolean
+  read_only: boolean
+  allowed_modem_ids: number[] | null
+}
+
+const ADMIN_PERM: EffectivePerm = {
+  can_view_sim: true,
+  can_approve_requests: true,
+  can_view_history: true,
+  read_only: false,
+  allowed_modem_ids: null,
+}
+
+const NO_PERM: EffectivePerm = {
+  can_view_sim: false,
+  can_approve_requests: false,
+  can_view_history: false,
+  read_only: true,
+  allowed_modem_ids: [],
 }
 
 interface AuthState {
@@ -13,8 +31,9 @@ interface AuthState {
   user: UserOut | null
   setAuth: (token: string, user: UserOut) => void
   clearAuth: () => void
-  perm: () => PermissionOut
+  perm: () => EffectivePerm
   canSupport: () => boolean
+  canApprove: () => boolean
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -26,31 +45,33 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => set({ token: null, user: null }),
       perm: () => {
         const u = get().user
-        if (!u) return FULL_PERM
-        if (u.role === 'admin') return FULL_PERM
+        if (!u) return NO_PERM
+        if (u.role === 'admin') return ADMIN_PERM
         const roles = u.rbac_roles ?? []
-        if (roles.length > 0) {
-          // Device scope: unrestricted if any role has null; else union of IDs
-          const hasUnlimited = roles.some(r => r.allowed_modem_ids === null)
-          const modemIds = hasUnlimited
-            ? null
-            : [...new Set(roles.flatMap(r => r.allowed_modem_ids ?? []))]
-          return {
-            can_view_sim:      roles.some(r => r.can_view_sim),
-            can_send_sms:      roles.some(r => r.can_send_sms),
-            can_manage_tasks:  roles.some(r => r.can_manage_tasks),
-            can_view_history:  roles.some(r => r.can_view_history),
-            read_only:         roles.every(r => r.read_only),
-            allowed_modem_ids: modemIds,
-          }
+        if (roles.length === 0) return NO_PERM
+        const hasUnlimited = roles.some(r => r.allowed_modem_ids === null)
+        const modemIds = hasUnlimited
+          ? null
+          : [...new Set(roles.flatMap(r => r.allowed_modem_ids ?? []))]
+        return {
+          can_view_sim:         roles.some(r => r.can_view_sim),
+          can_approve_requests: roles.some(r => r.can_approve_requests),
+          can_view_history:     roles.some(r => r.can_view_history),
+          read_only:            roles.every(r => r.read_only),
+          allowed_modem_ids:    modemIds,
         }
-        return u.permission ?? FULL_PERM
       },
       canSupport: () => {
         const u = get().user
         if (!u) return false
         if (u.role === 'admin') return true
         return (u.rbac_roles ?? []).some(r => r.can_support)
+      },
+      canApprove: () => {
+        const u = get().user
+        if (!u) return false
+        if (u.role === 'admin') return true
+        return (u.rbac_roles ?? []).some(r => r.can_approve_requests)
       },
     }),
     { name: 'simnexus-auth' }

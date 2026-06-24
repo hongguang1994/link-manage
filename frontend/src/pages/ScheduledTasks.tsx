@@ -7,6 +7,8 @@ import {
 import { useModemStore } from '../store/modemStore'
 import { useT } from '../i18n'
 import clsx from 'clsx'
+import { useAuthStore } from '../store/authStore'
+import { mySimRequestsApi, type SimAccessRequest } from '../api/simRequests'
 
 const statusBadge: Record<string, string> = {
   active: 'bg-green-900 text-green-300',
@@ -15,8 +17,9 @@ const statusBadge: Record<string, string> = {
   failed: 'bg-red-900 text-red-300',
 }
 
-function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const modems = useModemStore(s => s.modems)
+function CreateModal({ onClose, onCreated, useGrantedIds }: { onClose: () => void; onCreated: () => void; useGrantedIds: Set<number> | null }) {
+  const allModems = useModemStore(s => s.modems)
+  const modems = useGrantedIds === null ? allModems : allModems.filter(m => useGrantedIds.has(m.id))
   const t = useT()
   const [form, setForm] = useState({
     name: '', modem_id: '', recipients: '', content: '', cron_expression: '', send_once_at: ''
@@ -144,10 +147,37 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 export default function ScheduledTasks() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const [myRequests, setMyRequests] = useState<SimAccessRequest[]>([])
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
   const t = useT()
 
   const load = () => getTasksApi().then(r => setTasks(r.data))
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    if (!isAdmin) {
+      mySimRequestsApi().then(r => setMyRequests(r.data)).catch(() => {})
+    }
+  }, [isAdmin])
+
+  const now = new Date()
+  const grantedFromRequests = new Set(
+    myRequests
+      .filter(r => r.status === 'approved' && r.granted_level === 'use' && (!r.expires_at || new Date(r.expires_at) > now))
+      .map(r => r.modem_id)
+  )
+
+  // Approvers automatically have use-level access to their managed cards
+  // null = unrestricted (admin or unrestricted approver), Set = specific allowed IDs
+  const useGrantedIds: Set<number> | null = (() => {
+    if (isAdmin) return null
+    const roles = user?.rbac_roles ?? []
+    const approverRoles = roles.filter((r: any) => r.can_approve_requests)
+    if (approverRoles.some((r: any) => r.allowed_modem_ids == null)) return null // unrestricted approver
+    const ids = new Set(grantedFromRequests)
+    approverRoles.forEach((r: any) => (r.allowed_modem_ids ?? []).forEach((id: number) => ids.add(id)))
+    return ids
+  })()
 
   const toggleStatus = async (task: ScheduledTask) => {
     const newStatus = task.status === 'active' ? 'paused' : 'active'
@@ -219,7 +249,7 @@ export default function ScheduledTasks() {
         </div>
       )}
 
-      {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={load} />}
+      {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={load} useGrantedIds={useGrantedIds} />}
     </div>
   )
 }

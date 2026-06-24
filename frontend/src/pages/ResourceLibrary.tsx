@@ -1,0 +1,280 @@
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Wifi, WifiOff, AlertCircle, HelpCircle, RefreshCw, CheckCircle, Clock, X, Lock } from 'lucide-react'
+import clsx from 'clsx'
+import { getAvailableModemsApi, type Modem } from '../api/modems'
+import { mySimRequestsApi, createSimRequestApi, type SimAccessRequest, type PermissionLevel } from '../api/simRequests'
+import { useAuthStore } from '../store/authStore'
+import { useLangStore } from '../store/langStore'
+
+const STATUS_CFG = {
+  connected:    { icon: Wifi,        color: 'text-emerald-400', dot: '#34d399', label: '在线' },
+  disconnected: { icon: WifiOff,     color: 'text-slate-500',   dot: '#64748b', label: '离线' },
+  error:        { icon: AlertCircle, color: 'text-red-400',     dot: '#f87171', label: '故障' },
+  unknown:      { icon: HelpCircle,  color: 'text-amber-400',   dot: '#fbbf24', label: '未知' },
+} as const
+
+type AccessStatus = 'use' | 'view' | 'pending' | 'none' | 'expired'
+
+// ApproverScope: null = not an approver, 'all' = unrestricted approver, Set = managed modem IDs
+type ApproverScope = Set<number> | 'all' | null
+
+/** Derive approver scope from RBAC roles */
+function getApproverScope(roles: any[]): ApproverScope {
+  const approverRoles = roles.filter(r => r.can_approve_requests)
+  if (approverRoles.length === 0) return null
+  if (approverRoles.some(r => r.allowed_modem_ids == null)) return 'all'
+  const ids = new Set<number>()
+  approverRoles.forEach(r => (r.allowed_modem_ids ?? []).forEach((id: number) => ids.add(id)))
+  return ids
+}
+
+/** Status from explicit request records only */
+function getRequestStatus(modemId: number, requests: SimAccessRequest[]): AccessStatus {
+  const now = new Date()
+  const approved = requests.find(r => r.modem_id === modemId && r.status === 'approved' && (!r.expires_at || new Date(r.expires_at) > now))
+  if (approved) return approved.granted_level === 'use' ? 'use' : 'view'
+  if (requests.find(r => r.modem_id === modemId && r.status === 'pending')) return 'pending'
+  if (requests.find(r => r.modem_id === modemId && r.status === 'approved' && r.expires_at && new Date(r.expires_at) <= now)) return 'expired'
+  return 'none'
+}
+
+/** Effective status for the current user — single source of truth */
+function getEffectiveStatus(
+  modemId: number,
+  isAdmin: boolean,
+  approverScope: ApproverScope,
+  requests: SimAccessRequest[]
+): AccessStatus {
+  if (isAdmin) return 'use'
+  if (approverScope === 'all' || (approverScope instanceof Set && approverScope.has(modemId))) return 'use'
+  return getRequestStatus(modemId, requests)
+}
+
+const ACCESS_BADGE: Record<AccessStatus, { label: string; cls: string }> = {
+  use:     { label: '已授权·使用', cls: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' },
+  view:    { label: '已授权·查看', cls: 'bg-blue-500/15 text-blue-300 border border-blue-500/30' },
+  pending: { label: '审批中',      cls: 'bg-amber-500/15 text-amber-300 border border-amber-500/30' },
+  expired: { label: '已过期',      cls: 'bg-gray-600/30 text-gray-400 border border-gray-600/30' },
+  none:    { label: '未授权',      cls: 'bg-red-500/10 text-red-400 border border-red-500/20' },
+}
+
+function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => void; onDone: () => void }) {
+  const lang = useLangStore(s => s.lang)
+  const [level, setLevel] = useState<PermissionLevel>('use')
+  const [reason, setReason] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState('')
+
+  const submit = async () => {
+    setLoading(true); setErr('')
+    try {
+      await createSimRequestApi(modem.id, reason || undefined, level)
+      onDone(); onClose()
+    } catch (e: any) {
+      setErr(e.response?.data?.detail || '提交失败')
+    } finally { setLoading(false) }
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4" style={{ zIndex: 9999 }} onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl overflow-hidden"
+        style={{ background: '#0d1b30', border: '1px solid rgba(59,130,246,0.35)', boxShadow: '0 0 40px rgba(59,130,246,0.2), 0 25px 60px rgba(0,0,0,0.5)' }}
+        onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(59,130,246,0.15)', background: 'rgba(59,130,246,0.06)' }}>
+          <div>
+            <h2 className="text-base font-semibold text-white">申请权限</h2>
+            <p className="text-xs text-blue-300/60 mt-0.5">
+              {modem.alias || `SIM ${modem.id}`}{modem.operator ? ` — ${modem.operator}` : ''}
+            </p>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        {/* Body */}
+        <div className="p-6 space-y-4">
+
+        <div>
+          <p className="text-xs text-blue-200/50 uppercase tracking-wider mb-2">申请权限级别</p>
+          <div className="grid grid-cols-2 gap-2">
+            {([['use', '使用权限', '可发短信 / 创建定时任务'], ['view', '仅查看', '查看设备信息，不可发送']] as const).map(([v, title, desc]) => (
+              <button key={v} onClick={() => setLevel(v)}
+                className={clsx('p-3 rounded-xl border text-left transition-all', level === v
+                  ? 'border-blue-500 bg-blue-500/15 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
+                  : 'border-blue-500/15 bg-white/3 hover:border-blue-500/40')}>
+                <p className="text-sm font-medium text-white">{title}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-blue-200/50 uppercase tracking-wider mb-1.5">申请理由（可选）</label>
+          <textarea
+            value={reason} onChange={e => setReason(e.target.value)} rows={2}
+            placeholder="简单说明使用用途..."
+            className="w-full rounded-xl px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500/60 placeholder-gray-600"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(59,130,246,0.2)' }}
+          />
+        </div>
+
+        {err && <p className="text-red-400 text-xs">{err}</p>}
+
+        <div className="flex gap-3 justify-end pt-1">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white">取消</button>
+          <button onClick={submit} disabled={loading}
+            className="px-5 py-2 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-50"
+            style={{ background: 'linear-gradient(135deg,#3b82f6,#6366f1)', boxShadow: '0 0 16px rgba(59,130,246,0.35)' }}>
+            {loading ? '提交中...' : '提交申请'}
+          </button>
+        </div>
+        </div>{/* end body */}
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+export default function ResourceLibrary() {
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
+  const [modems, setModems] = useState<Modem[]>([])
+  const [requests, setRequests] = useState<SimAccessRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [applyTarget, setApplyTarget] = useState<Modem | null>(null)
+
+  const approverScope = isAdmin ? null : getApproverScope(user?.rbac_roles ?? [])
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [mRes, rRes] = await Promise.all([
+        getAvailableModemsApi(),
+        isAdmin ? Promise.resolve({ data: [] as SimAccessRequest[] }) : mySimRequestsApi(),
+      ])
+      setModems(mRes.data)
+      setRequests(rRes.data)
+    } finally { setLoading(false) }
+  }
+
+  useEffect(() => { load() }, [])
+
+  return (
+    <div className="p-6 space-y-6 animate-fade-up">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white text-glow">SIM 资源库</h1>
+          <p className="text-sm text-blue-200/50 mt-0.5">系统中所有可用的 SIM 卡资源</p>
+        </div>
+        <button onClick={load} disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-blue-300/70 hover:text-blue-200 transition-colors disabled:opacity-50"
+          style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
+          <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} /> 刷新
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-blue-300/40 py-16 justify-center">
+          <RefreshCw className="w-4 h-4 animate-spin" /> 加载中...
+        </div>
+      ) : modems.length === 0 ? (
+        <div className="rounded-2xl p-16 text-center border border-dashed border-blue-500/15 text-blue-300/30">
+          暂无 SIM 卡资源
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {modems.map(m => {
+            const effectiveStatus = getEffectiveStatus(m.id, isAdmin, approverScope, requests)
+            const badge = ACCESS_BADGE[effectiveStatus]
+            const modemCfg = STATUS_CFG[m.status as keyof typeof STATUS_CFG] ?? STATUS_CFG.unknown
+            const Icon = modemCfg.icon
+            const canApply = !isAdmin && (effectiveStatus === 'none' || effectiveStatus === 'expired')
+
+            return (
+              <div key={m.id}
+                className="relative overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5 group"
+                style={{
+                  background: 'rgba(13,27,48,0.75)',
+                  backdropFilter: 'blur(20px)',
+                  border: `1px solid ${effectiveStatus === 'use' ? 'rgba(52,211,153,0.2)' : effectiveStatus === 'pending' ? 'rgba(251,191,36,0.15)' : 'rgba(59,130,246,0.12)'}`,
+                  boxShadow: effectiveStatus === 'use' ? '0 0 20px rgba(52,211,153,0.1)' : '0 0 20px rgba(59,130,246,0.06)',
+                }}>
+                {/* top glow line */}
+                <div className="absolute top-0 left-4 right-4 h-px opacity-40"
+                  style={{ background: `linear-gradient(90deg,transparent,${modemCfg.dot},transparent)` }} />
+
+                {/* Header */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-white truncate group-hover:text-blue-200 transition-colors">
+                      {m.alias || `SIM ${m.id}`}
+                    </h3>
+                    <p className="text-xs text-blue-200/30 mt-0.5 truncate">{m.operator || '未知运营商'}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
+                    <Icon className={`w-4 h-4 ${modemCfg.color}`} style={{ filter: `drop-shadow(0 0 4px ${modemCfg.dot})` }} />
+                    <span className="text-[10px]" style={{ color: modemCfg.dot }}>{modemCfg.label}</span>
+                  </div>
+                </div>
+
+                {/* Info */}
+                <div className="space-y-1.5 text-xs mb-3">
+                  <div className="flex justify-between">
+                    <span className="text-blue-200/40">号码</span>
+                    <span className="text-blue-100/70">{m.phone_number || '—'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-blue-200/40">信号</span>
+                    <div className="flex items-end gap-0.5 h-3">
+                      {[1,2,3,4,5].map(i => {
+                        const bars = Math.round((m.signal_quality / 100) * 5)
+                        const colors = ['#f87171','#fb923c','#facc15','#4ade80','#34d399']
+                        return <div key={i} className="w-1 rounded-sm"
+                          style={{ height: `${i * 20}%`, background: i <= bars ? (colors[bars-1] ?? '#34d399') : 'rgba(255,255,255,0.08)' }} />
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Access badge + action */}
+                <div className="flex items-center justify-between">
+                  <span className={clsx('text-[11px] px-2 py-0.5 rounded-full', badge.cls)}>{badge.label}</span>
+                  {canApply && (
+                    <button onClick={() => setApplyTarget(m)}
+                      className="text-xs px-3 py-1 rounded-lg text-blue-300 transition-all hover:text-white"
+                      style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)' }}>
+                      申请权限
+                    </button>
+                  )}
+                  {effectiveStatus === 'pending' && (
+                    <span className="flex items-center gap-1 text-xs text-amber-400/70">
+                      <Clock className="w-3 h-3" /> 等待审批
+                    </span>
+                  )}
+                  {(effectiveStatus === 'use' || effectiveStatus === 'view') && (
+                    <span className="flex items-center gap-1 text-xs text-emerald-400/70">
+                      <CheckCircle className="w-3 h-3" /> 可使用
+                    </span>
+                  )}
+                  {isAdmin && (
+                    <span className="flex items-center gap-1 text-xs text-blue-400/60">
+                      <Lock className="w-3 h-3" /> 管理员
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {applyTarget && (
+        <ApplyModal modem={applyTarget} onClose={() => setApplyTarget(null)} onDone={load} />
+      )}
+    </div>
+  )
+}

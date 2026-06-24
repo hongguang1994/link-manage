@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SimNexus is a multi-USB 4G modem management system. It manages multiple SIM cards, handles real-time modem status monitoring via WebSocket, and provides SMS sending (manual and scheduled), SMS templates with variable substitution, RBAC-based user/role management, a notification system, and a support chat feature. The system runs on Debian/Ubuntu and communicates with modems through the Linux `ModemManager` daemon via the `mmcli` CLI tool. It also supports ZTE portable WiFi devices via their HTTP goform API (`services/zte_http_modem.py`).
+SimNexus is a multi-USB 4G modem management system. It manages multiple SIM cards, handles real-time modem status monitoring via WebSocket, and provides SMS sending (manual and scheduled), SMS templates with variable substitution, RBAC-based user/role management, card-level access control (apply → approve → use), a notification system, and a support chat feature. The system runs on Debian/Ubuntu and communicates with modems through the Linux `ModemManager` daemon via the `mmcli` CLI tool. It also supports ZTE portable WiFi devices via their HTTP goform API (`services/zte_http_modem.py`).
 
 ## Commands
 
@@ -53,12 +53,13 @@ The backend is a single FastAPI app with four concurrently running components:
 1. **HTTP API** (`app/api/`) — REST endpoints for all features. All routes are prefixed with `/api`. Modules:
    - `auth.py` — login, `/auth/me` (returns user + RBAC roles)
    - `captcha.py` — SVG captcha generation and JWT-signed answer verification
-   - `modems.py` — device CRUD
-   - `sms.py` — send, history, scheduled tasks (user-scoped) and admin views
-   - `users.py` — user CRUD, password reset, legacy per-user permissions
+   - `modems.py` — device CRUD; `GET /modems/available` returns all modems for browsing (resource library)
+   - `sms.py` — send, history, scheduled tasks (user-scoped); `/admin/tasks` returns all tasks for admin, own tasks for regular users
+   - `users.py` — user CRUD, password reset
    - `roles.py` — RBAC role CRUD and user-role assignment (`PUT /roles/users/{user_id}/roles`)
    - `notifications.py` — audience-filtered notification list, unread count, mark-read
    - `support.py` — support chat messages, file upload, conversation list (staff only)
+   - `sim_requests.py` — SIM card access request workflow (apply / approve / reject / direct grant)
    - `ws.py` — WebSocket push of modem state
 
 2. **Modem Poller** (`app/services/modem_poller.py`) — An `asyncio` background task (started in `lifespan`) that calls `modem_manager.list_modems()` every `MODEM_POLL_INTERVAL` seconds, then also calls `zte_http_modem.get_modem_info()` to poll any ZTE device at `192.168.0.1`. It upserts modem state into the DB keyed on `mm_object_path` and ingests any new inbound SMS, deduplicating by `mm_sms_index`. ZTE modems use synthetic path `zte:192.168.0.1`.
@@ -75,19 +76,31 @@ The backend is a single FastAPI app with four concurrently running components:
 
 **WebSocket** (`app/api/ws.py`) — `/ws/modems?token=<JWT>` pushes all modem state from DB every 5 seconds to all connected clients. State comes from DB (written by the poller), not live from mmcli.
 
-**Startup initialization** (`app/main.py` `lifespan`) — Only runs `Base.metadata.create_all`. Initial data (admin user + 5 system roles) is no longer seeded from code; it lives in `docs/schema.sql`. To initialize a fresh database: `sqlite3 sim_manager.db < docs/schema.sql`.
+**Startup initialization** (`app/main.py` `lifespan`) — Only runs `Base.metadata.create_all`. Initial data (admin user + system roles) is no longer seeded from code; it lives in `docs/schema.sql`. To initialize a fresh database: `sqlite3 sim_manager.db < docs/schema.sql`.
 
 ### Security layer (`app/core/security.py`)
 
 - **JWT auth** — `python-jose` with HS256; `bcrypt` directly (NOT `passlib` — passlib fails on Python 3.13)
 - **`get_current_user`** — dependency that decodes JWT and loads user from DB with `rbac_roles` joined
 - **`require_admin`** — dependency that raises 403 unless `user.role == UserRole.ADMIN`
+- **`require_approve_requests`** — dependency that raises 403 unless admin or role has `can_approve_requests=True`
 - **`require_support_staff`** — dependency that raises 403 unless `is_support_staff(user)` is true
 - **`_perm(user)`** — resolves effective permissions:
   1. If `role == ADMIN` → full access
   2. If user has RBAC roles → merge by union (positive flags: `any()`; `read_only`: `all()`; device scope: union of IDs, or unrestricted if any role has `allowed_modem_ids=None`)
-  3. Else fall back to legacy `UserPermission` row
+  3. Else → no permissions
+- **`get_user_modem_grants(user_id, db, level, user)`** — returns modem IDs the user has access to. If `user` has `can_approve_requests`, their managed cards (`allowed_modem_ids`) are automatically included at use-level without requiring explicit grants.
 - **`is_support_staff(user)`** — returns True if admin OR any RBAC role has `can_support=True`
+
+### Card-level access control (`app/api/sim_requests.py`)
+
+Users apply for access to individual SIM cards; approvers review and grant/reject. Key concepts:
+
+- **`SimAccessRequest`** table — tracks each user's request per modem with `status` (pending/approved/rejected), `requested_level`, `granted_level` (`view` | `use`), optional `expires_at`
+- **Approver scope** — `_approver_modem_scope(approver)` returns the modem IDs an approver can manage (from `allowed_modem_ids`). `None` = unrestricted. Approvers can only approve/reject requests for modems within their scope.
+- **Approver auto-access** — Approvers automatically have use-level access to all cards in their managed scope without needing to submit requests. This is enforced in `get_user_modem_grants()`.
+- **Direct grant** — `POST /sim-requests/grant` allows approvers to grant access directly without requiring a prior application.
+- **Endpoints**: `POST /` (apply), `GET /my` (own requests), `GET /` (approver list, scoped), `PUT /{id}/approve`, `PUT /{id}/reject`, `POST /batch-approve`, `POST /grant`
 
 ### Data models
 
@@ -101,7 +114,6 @@ user_roles = Table("user_roles", Base.metadata,
 class User(Base):
     role = Column(Enum(UserRole))   # system-level: admin | user
     rbac_roles = relationship("Role", secondary=user_roles, lazy="joined")
-    permission = relationship("UserPermission", ...)   # legacy fallback
 ```
 
 **`models/role.py`**
@@ -109,9 +121,20 @@ class User(Base):
 class Role(Base):
     __tablename__ = "roles"
     name, description, is_system
-    can_view_sim, can_send_sms, can_manage_tasks, can_view_history  # boolean flags
-    read_only, can_support                                           # boolean flags
-    allowed_modem_ids = Column(JSON, nullable=True)                  # None = unrestricted
+    can_view_sim, can_approve_requests, can_manage_tasks, can_view_history  # boolean flags
+    read_only, can_support                                                   # boolean flags
+    allowed_modem_ids = Column(JSON, nullable=True)  # None = unrestricted scope
+```
+
+**`models/sim_request.py`**
+```python
+class SimAccessRequest(Base):
+    user_id, modem_id
+    status = Column(Enum(RequestStatus))          # pending | approved | rejected
+    requested_level = Column(Enum(PermissionLevel))  # view | use
+    granted_level = Column(Enum(PermissionLevel), nullable=True)
+    reason, admin_note
+    expires_at = Column(DateTime, nullable=True)  # None = permanent
 ```
 
 **`models/notification.py`** — `audience` values: `"admin"`, `"support"`, `"all"`, `"user"` (paired with `target_user_id`)
@@ -136,7 +159,7 @@ Support chat messages push `audience="support"` to notify staff, and `audience="
 ### Frontend (React 18 + TypeScript + Vite + Tailwind)
 
 **Stores (Zustand with `persist` middleware)**:
-- `authStore.ts` — `token`, `user` (includes `rbac_roles[]`), computed `perm()` and `canSupport()`
+- `authStore.ts` — `token`, `user` (includes `rbac_roles[]`), computed `perm()`, `canSupport()`, `canApprove()`
 - `modemStore.ts` — modem list, updated by WebSocket hook
 - `langStore.ts` — current language (`zh` | `en`), persisted to localStorage
 - `themeStore.ts` — current theme (`light` | `dark` | `system`), persisted to localStorage
@@ -144,34 +167,61 @@ Support chat messages push `audience="support"` to notify staff, and `audience="
 **`authStore.perm()` logic** (mirrors backend `_perm()`):
 - Admin → full access
 - Has RBAC roles → merge: `some()` for positive flags, `every()` for `read_only`, union of `allowed_modem_ids`
-- No roles → fall back to `user.permission`
+- No roles → no permissions
 
 **`authStore.canSupport()`**: admin always true; else `rbac_roles.some(r => r.can_support)`.
 
+**`authStore.canApprove()`**: admin always true; else `rbac_roles.some(r => r.can_approve_requests)`.
+
 **i18n** — `src/i18n/zh.ts` and `en.ts` export flat key→string maps. `useT()` hook reads `langStore` and returns the lookup function. System role names (stored in Chinese in DB) are translated client-side via a hardcoded map in `Roles.tsx`.
 
-**Layout.tsx** — calls `getMeApi()` on mount to refresh user data (including latest RBAC roles) into `authStore`. Shows support nav link when `canSupport()`, roles nav link when `user.role === 'admin'`.
+**Layout.tsx** — calls `getMeApi()` on mount to refresh user data (including latest RBAC roles) into `authStore`. Nav links visibility:
+- 资源库/SIM卡管理 → `can_view_sim`
+- 发送短信/短信模板/定时任务 → `!read_only`
+- 短信记录 → all authenticated users
+- 我的任务记录/任务监控 → `!read_only` (admin sees all users' tasks; others see own tasks only)
+- SIM申请审批 → `canApprove()`
+- 用户管理/角色管理 → admin only
+- 用户咨询 → `canSupport()`
+
+**Header role display** — shows RBAC role names (e.g. "审批员 · 客服") when user has roles; falls back to "管理员" or "普通用户".
 
 **Route guards**:
 - `RequireAuth` — redirects to `/login` if no token
 - `RequireAdmin` — redirects to `/` if not admin
 - `RequireSupport` — redirects to `/` if `!canSupport()`
+- `RequireApprove` — redirects to `/` if `!canApprove()`
 
 **Pages**:
 | Page | Path | Guard |
 |------|------|-------|
 | Login | `/login` | public |
 | Dashboard | `/` | RequireAuth |
+| ResourceLibrary | `/resources` | RequireAuth + `can_view_sim` |
 | SimCards | `/sim-cards` | RequireAuth + `can_view_sim` |
 | SimDetail | `/modems/:id` | RequireAuth + `can_view_sim` |
-| SmsSend | `/send` | RequireAuth + `can_send_sms` |
-| Templates | `/templates` | RequireAuth + `can_send_sms` |
-| SmsHistory | `/history` | RequireAuth + `can_view_history` |
-| ScheduledTasks | `/tasks` | RequireAuth + `can_manage_tasks` |
+| SmsSend | `/send` | RequireAuth + `!read_only` |
+| Templates | `/templates` | RequireAuth + `!read_only` |
+| SmsHistory | `/history` | RequireAuth |
+| ScheduledTasks | `/tasks` | RequireAuth + `!read_only` |
+| AdminTasks | `/admin/tasks` | RequireAuth + `!read_only` |
 | Users | `/users` | RequireAdmin |
 | Roles | `/roles` | RequireAdmin |
 | SupportAdmin | `/support` | RequireSupport |
-| AdminTasks | `/admin/tasks` | RequireAdmin |
+| SimRequests | `/admin/sim-requests` | RequireApprove |
+
+**ResourceLibrary (`src/pages/ResourceLibrary.tsx`)** — shows all SIM cards; effective access status is computed by `getEffectiveStatus()`:
+```typescript
+// Single source of truth for card access status per user
+function getEffectiveStatus(modemId, isAdmin, approverScope, requests): AccessStatus {
+  if (isAdmin) return 'use'
+  if (approverScope === 'all' || approverScope?.has(modemId)) return 'use'
+  return getRequestStatus(modemId, requests)  // from SimAccessRequest records
+}
+// approverScope: null = not an approver, 'all' = unrestricted, Set<number> = managed IDs
+```
+
+**SmsSend / ScheduledTasks modem filtering** — admins and unrestricted approvers see all modems; restricted approvers see their managed cards + explicitly granted cards; regular users see only use-level granted cards.
 
 **API clients** (`src/api/`): `client.ts` is the Axios base with JWT `Authorization` header injected automatically; each domain module exports typed API functions.
 
@@ -202,3 +252,5 @@ File uploads stored at `/opt/simnexus/uploads/` (UUID-named, served without auth
 - `send_once_at` is stored in UTC. The frontend must convert local datetime-local input to ISO UTC string via `new Date(val).toISOString()` before submitting. APScheduler's `DateTrigger` interprets naive datetimes as UTC.
 - SMS templates store variable names as a JSON list in `sms_templates.variables`. The frontend auto-detects `{var}` placeholders from content using a regex and presents a fill-in dialog before sending.
 - `navigator.clipboard` requires HTTPS; the frontend uses `document.execCommand('copy')` as fallback for HTTP deployments.
+- Approvers automatically have use-level access to their managed cards (`allowed_modem_ids`) without needing to submit requests. This is enforced in both backend (`get_user_modem_grants`) and frontend (modem list filtering). `allowed_modem_ids=null` on an approver role means unrestricted access to all cards.
+- Modal components must use `createPortal(…, document.body)` to avoid CSS stacking context issues caused by ancestor elements with CSS animations (`transform`/`opacity`). Do not render modals as children of animated wrappers.

@@ -29,6 +29,7 @@ export interface ModemDetail extends Modem {
 }
 
 export const getModemsApi = () => api.get<Modem[]>('/modems/')
+export const getAvailableModemsApi = () => api.get<Modem[]>('/modems/available')
 export const getModemDetailApi = (id: number) => api.get<ModemDetail>(`/modems/${id}/detail`)
 export const updateModemApi = (id: number, data: { alias?: string }) => api.patch<Modem>(`/modems/${id}`, data)
 export const refreshModemApi = (id: number) => api.post<Modem>(`/modems/${id}/refresh`)

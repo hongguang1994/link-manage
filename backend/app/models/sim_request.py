@@ -11,6 +11,11 @@ class RequestStatus(str, enum.Enum):
     REJECTED = "rejected"
 
 
+class PermissionLevel(str, enum.Enum):
+    VIEW = "view"    # can see card info only
+    USE = "use"      # can send SMS / create tasks (implies view)
+
+
 class SimAccessRequest(Base):
     __tablename__ = "sim_access_requests"
 
@@ -18,6 +23,8 @@ class SimAccessRequest(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     modem_id = Column(Integer, ForeignKey("modems.id", ondelete="CASCADE"), nullable=False)
     status = Column(SAEnum(RequestStatus), default=RequestStatus.PENDING, nullable=False)
+    requested_level = Column(SAEnum(PermissionLevel), default=PermissionLevel.USE, nullable=False)
+    granted_level = Column(SAEnum(PermissionLevel), nullable=True)   # set on approval, may differ from requested
     reason = Column(Text, nullable=True)
     admin_note = Column(Text, nullable=True)
     expires_at = Column(DateTime, nullable=True)  # None = permanent

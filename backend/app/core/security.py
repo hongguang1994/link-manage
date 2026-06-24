@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List
 import bcrypt
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.core.database import get_db
 
 SECRET_KEY = "simnexus-secret-key-change-in-production"
@@ -58,114 +59,94 @@ def require_admin(current_user=Depends(get_current_user)):
 
 
 def _perm(user):
-    """Return effective permission object.
-    Priority: admin > merged RBAC roles > legacy UserPermission > full-access default.
-    Role merging: any True wins for flags; read_only=False if any role allows writes;
-    allowed_modem_ids=None (all) if any role has no restriction, else union of IDs.
-    Approved SimAccessRequests are merged on top as additional device grants."""
+    """Return merged permission dict from user's RBAC roles.
+    Admin users bypass all checks — callers should check user.role == ADMIN first.
+    Returns None if user has no roles assigned.
+    """
     from app.models.user import UserRole
-    from app.models.permission import UserPermission
     if user.role == UserRole.ADMIN:
-        return UserPermission(
-            can_view_sim=True, can_send_sms=True,
-            can_manage_tasks=True, can_view_history=True,
-            read_only=False, allowed_modem_ids=None,
-        )
-    roles = getattr(user, "rbac_roles", None)
-    if roles:
-        view_sim = any(r.can_view_sim for r in roles)
-        send_sms = any(r.can_send_sms for r in roles)
-        manage  = any(r.can_manage_tasks for r in roles)
-        history = any(r.can_view_history for r in roles)
-        ro      = all(r.read_only for r in roles)   # read_only only if ALL roles are read_only
-        # Device scope: None means unrestricted; union IDs otherwise
-        if any(r.allowed_modem_ids is None for r in roles):
-            modem_ids = None
-        else:
-            modem_ids = list({mid for r in roles for mid in (r.allowed_modem_ids or [])}) or None
-        base = UserPermission(
-            can_view_sim=view_sim, can_send_sms=send_sms,
-            can_manage_tasks=manage, can_view_history=history,
-            read_only=ro, allowed_modem_ids=modem_ids,
-        )
+        return {
+            "can_view_sim": True,
+            "can_approve_requests": True,
+            "can_view_history": True,
+            "can_support": True,
+            "read_only": False,
+            "allowed_modem_ids": None,
+        }
+    roles = getattr(user, "rbac_roles", None) or []
+    if not roles:
+        return None
+
+    if any(r.allowed_modem_ids is None for r in roles):
+        modem_ids = None
     else:
-        p = user.permission
-        if p is None:
-            return None
-        # Copy to avoid mutating the ORM object
-        base = UserPermission(
-            can_view_sim=p.can_view_sim, can_send_sms=p.can_send_sms,
-            can_manage_tasks=p.can_manage_tasks, can_view_history=p.can_view_history,
-            read_only=p.read_only,
-            allowed_modem_ids=list(p.allowed_modem_ids) if p.allowed_modem_ids else p.allowed_modem_ids,
-        )
+        modem_ids = list({mid for r in roles for mid in (r.allowed_modem_ids or [])}) or None
 
-    # Skip merging if user already has unrestricted send_sms
-    if base.can_send_sms and base.allowed_modem_ids is None:
-        return base
-
-    # Merge approved (non-expired) sim access requests
-    _merge_sim_grants(user.id, base)
-    return base
+    return {
+        "can_view_sim":         any(r.can_view_sim for r in roles),
+        "can_approve_requests": any(r.can_approve_requests for r in roles),
+        "can_view_history":     any(r.can_view_history for r in roles),
+        "can_support":          any(r.can_support for r in roles),
+        "read_only":            all(r.read_only for r in roles),
+        "allowed_modem_ids":    modem_ids,
+    }
 
 
-def _merge_sim_grants(user_id: int, perm) -> None:
-    """Query approved SimAccessRequests and merge modem IDs into perm in-place."""
-    from app.models.sim_request import SimAccessRequest, RequestStatus
-    from app.core.database import SessionLocal
-    from datetime import datetime
-    from sqlalchemy import or_
-
+def get_user_modem_grants(user_id: int, db: Session, level: Optional[str] = None, user=None) -> List[int]:
+    """Return modem IDs the user has access to.
+    For approvers, their managed cards (allowed_modem_ids) are automatically included at use level.
+    level=None → any grant (view or use)
+    level='use' → only use-level grants
+    """
+    from app.models.sim_request import SimAccessRequest, RequestStatus, PermissionLevel
+    from app.models.modem import Modem
     now = datetime.utcnow()
-    db = SessionLocal()
-    try:
-        approved_ids = [
-            r.modem_id for r in db.query(SimAccessRequest.modem_id).filter(
-                SimAccessRequest.user_id == user_id,
-                SimAccessRequest.status == RequestStatus.APPROVED,
-                or_(SimAccessRequest.expires_at.is_(None), SimAccessRequest.expires_at > now),
-            ).all()
-        ]
-    finally:
-        db.close()
+    q = db.query(SimAccessRequest.modem_id).filter(
+        SimAccessRequest.user_id == user_id,
+        SimAccessRequest.status == RequestStatus.APPROVED,
+        or_(SimAccessRequest.expires_at.is_(None), SimAccessRequest.expires_at > now),
+        SimAccessRequest.granted_level.isnot(None),
+    )
+    if level == "use":
+        q = q.filter(SimAccessRequest.granted_level == PermissionLevel.USE)
+    grant_ids = set(r.modem_id for r in q.all())
 
-    if not approved_ids:
-        return
+    # Approvers automatically have use-level access to their managed cards
+    if user is not None:
+        p = _perm(user)
+        if p and p.get("can_approve_requests"):
+            managed = p.get("allowed_modem_ids")
+            if managed is None:
+                # Unrestricted approver → all modem IDs
+                all_ids = [r.id for r in db.query(Modem.id).all()]
+                grant_ids.update(all_ids)
+            else:
+                grant_ids.update(managed)
 
-    perm.can_send_sms = True
-    perm.can_manage_tasks = True
-    if perm.allowed_modem_ids is None:
-        # already unrestricted — no change needed
-        pass
-    else:
-        perm.allowed_modem_ids = list(set(perm.allowed_modem_ids) | set(approved_ids))
+    return list(grant_ids)
 
 
-def require_send_sms(current_user=Depends(get_current_user)):
+def require_approve_requests(current_user=Depends(get_current_user)):
+    from app.models.user import UserRole
+    if current_user.role == UserRole.ADMIN:
+        return current_user
     p = _perm(current_user)
-    if not p or not p.can_send_sms:
-        raise HTTPException(status_code=403, detail="无发送短信权限")
-    if p.read_only:
-        raise HTTPException(status_code=403, detail="当前账号为只读模式")
-    return current_user
-
-
-def require_manage_tasks(current_user=Depends(get_current_user)):
-    p = _perm(current_user)
-    if not p or not p.can_manage_tasks:
-        raise HTTPException(status_code=403, detail="无定时任务管理权限")
+    if not p or not p.get("can_approve_requests"):
+        raise HTTPException(status_code=403, detail="无审批权限")
     return current_user
 
 
 def require_view_history(current_user=Depends(get_current_user)):
+    from app.models.user import UserRole
+    if current_user.role == UserRole.ADMIN:
+        return current_user
     p = _perm(current_user)
-    if not p or not p.can_view_history:
+    if not p or not p.get("can_view_history"):
         raise HTTPException(status_code=403, detail="无短信记录查看权限")
     return current_user
 
 
 def is_support_staff(user) -> bool:
-    """True for admin users or users with any RBAC role that has can_support=True."""
     from app.models.user import UserRole
     if user.role == UserRole.ADMIN:
         return True
@@ -178,11 +159,4 @@ def is_support_staff(user) -> bool:
 def require_support_staff(current_user=Depends(get_current_user)):
     if not is_support_staff(current_user):
         raise HTTPException(status_code=403, detail="无客服权限")
-    return current_user
-
-
-def require_write(current_user=Depends(get_current_user)):
-    p = _perm(current_user)
-    if p and p.read_only:
-        raise HTTPException(status_code=403, detail="当前账号为只读模式")
     return current_user

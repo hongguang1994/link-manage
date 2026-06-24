@@ -53,17 +53,13 @@ export default function SimCards() {
 
   const isAdmin = user?.role === 'admin'
 
-  // For non-admin users: determine per-modem access status
-  const hasDirectSendAccess = perm.can_send_sms && perm.allowed_modem_ids === null
-
   const modemAccessStatus = (modemId: number): 'access' | 'pending' | 'approved' | 'none' => {
-    if (isAdmin || hasDirectSendAccess) return 'access'
-    if (perm.can_send_sms && perm.allowed_modem_ids?.includes(modemId)) return 'access'
+    if (isAdmin) return 'access'
+    const now = new Date()
     const req = myRequests.find(r => r.modem_id === modemId)
     if (!req) return 'none'
     if (req.status === 'pending') return 'pending'
-    const now = new Date()
-    if (req.status === 'approved' && (!req.expires_at || new Date(req.expires_at) > now)) return 'approved'
+    if (req.status === 'approved' && req.granted_level === 'use' && (!req.expires_at || new Date(req.expires_at) > now)) return 'approved'
     return 'none'
   }
 
@@ -195,8 +191,18 @@ export default function SimCards() {
           <RefreshCw className="w-4 h-4 animate-spin" /> {t('loading')}
         </div>
       ) : rows.length === 0 ? (
-        <div className="bg-gray-800 border border-dashed border-gray-600 rounded-xl p-12 text-center text-gray-500">
-          {t('sim_no_device')}
+        <div className="bg-gray-800 border border-dashed border-gray-600 rounded-xl p-12 text-center space-y-3">
+          {isAdmin ? (
+            <p className="text-gray-500">{t('sim_no_device')}</p>
+          ) : (
+            <>
+              <p className="text-gray-400">暂无授权的 SIM 卡</p>
+              <p className="text-gray-600 text-sm">前往资源库申请 SIM 卡使用权限</p>
+              <a href="/resources" className="inline-block mt-1 text-sm text-blue-400 hover:text-blue-300">
+                去资源库 →
+              </a>
+            </>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-700">

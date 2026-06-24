@@ -3,6 +3,8 @@ import { Send, CheckCircle, XCircle, FileText, X } from 'lucide-react'
 import { useModemStore } from '../store/modemStore'
 import { sendSmsApi, getTemplatesApi, SmsTemplate } from '../api/sms'
 import { useT } from '../i18n'
+import { useAuthStore } from '../store/authStore'
+import { mySimRequestsApi, type SimAccessRequest } from '../api/simRequests'
 
 function extractVars(content: string): string[] {
   const matches = content.match(/\{(\w+)\}/g) || []
@@ -117,7 +119,9 @@ function VarFillModal({
 }
 
 export default function SmsSend() {
-  const modems = useModemStore(s => s.modems)
+  const allModems = useModemStore(s => s.modems)
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
   const t = useT()
   const [modemId, setModemId] = useState<number | ''>('')
   const [phone, setPhone] = useState('')
@@ -127,10 +131,37 @@ export default function SmsSend() {
   const [templates, setTemplates] = useState<SmsTemplate[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [pendingTpl, setPendingTpl] = useState<SmsTemplate | null>(null)
+  const [myRequests, setMyRequests] = useState<SimAccessRequest[]>([])
 
   useEffect(() => {
     getTemplatesApi().then(r => setTemplates(r.data)).catch(() => {})
-  }, [])
+    if (!isAdmin) {
+      mySimRequestsApi().then(r => setMyRequests(r.data)).catch(() => {})
+    }
+  }, [isAdmin])
+
+  const now = new Date()
+  const useGrantedIds = new Set(
+    myRequests
+      .filter(r => r.status === 'approved' && r.granted_level === 'use' && (!r.expires_at || new Date(r.expires_at) > now))
+      .map(r => r.modem_id)
+  )
+
+  // Approvers automatically have use-level access to their managed cards
+  // Returns: 'all' = unrestricted approver, Set = specific managed IDs, null = not an approver
+  const approverManagedIds: Set<number> | 'all' | null = (() => {
+    const roles = user?.rbac_roles ?? []
+    const approverRoles = roles.filter((r: any) => r.can_approve_requests)
+    if (approverRoles.length === 0) return null
+    if (approverRoles.some((r: any) => r.allowed_modem_ids == null)) return 'all'
+    const ids = new Set<number>()
+    approverRoles.forEach((r: any) => (r.allowed_modem_ids ?? []).forEach((id: number) => ids.add(id)))
+    return ids
+  })()
+
+  const modems = isAdmin || approverManagedIds === 'all'
+    ? allModems
+    : allModems.filter(m => useGrantedIds.has(m.id) || (approverManagedIds !== null && approverManagedIds.has(m.id)))
 
   const send = async () => {
     if (!modemId || !phone || !content) return

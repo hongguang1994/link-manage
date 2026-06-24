@@ -6,10 +6,9 @@ from datetime import datetime
 class RoleCreate(BaseModel):
     name: str
     description: str = ""
-    can_view_sim: bool = True
-    can_send_sms: bool = True
-    can_manage_tasks: bool = True
-    can_view_history: bool = True
+    can_view_sim: bool = False
+    can_approve_requests: bool = False
+    can_view_history: bool = False
     read_only: bool = False
     can_support: bool = False
     allowed_modem_ids: Optional[List[int]] = None
@@ -19,8 +18,7 @@ class RoleUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     can_view_sim: Optional[bool] = None
-    can_send_sms: Optional[bool] = None
-    can_manage_tasks: Optional[bool] = None
+    can_approve_requests: Optional[bool] = None
     can_view_history: Optional[bool] = None
     read_only: Optional[bool] = None
     can_support: Optional[bool] = None
@@ -33,8 +31,7 @@ class RoleOut(BaseModel):
     description: str
     is_system: bool
     can_view_sim: bool
-    can_send_sms: bool
-    can_manage_tasks: bool
+    can_approve_requests: bool
     can_view_history: bool
     read_only: bool
     can_support: bool

@@ -32,5 +32,3 @@ class User(Base):
 
     # Many-to-many RBAC roles
     rbac_roles = relationship("Role", secondary=user_roles, lazy="joined")
-
-    permission = relationship("UserPermission", back_populates="user", uselist=False, cascade="all, delete-orphan")
