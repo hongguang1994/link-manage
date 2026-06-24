@@ -13,6 +13,11 @@ from app.models.modem import Modem, ModemStatus
 from app.models.sms import SmsMessage, SmsDirection, SmsStatus
 from app.services import modem_manager
 from app.services.notify import push
+try:
+    from app.services import zte_http_modem as _zte
+    _ZTE_AVAILABLE = True
+except ImportError:
+    _ZTE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 # Track previous modem statuses to detect transitions
@@ -38,6 +43,18 @@ def stop_polling():
 
 async def _poll():
     detected = modem_manager.list_modems()
+
+    # Supplement with ZTE HTTP devices
+    if _ZTE_AVAILABLE:
+        try:
+            zte_info = await asyncio.get_event_loop().run_in_executor(
+                None, _zte.get_modem_info
+            )
+            if zte_info:
+                zte_info["_source"] = "zte"
+                detected.append(zte_info)
+        except Exception as e:
+            logger.debug(f"ZTE poll skipped: {e}")
     db = SessionLocal()
     try:
         seen_paths = set()
@@ -78,7 +95,10 @@ async def _poll():
             _prev_status[path] = new_status
 
             # Ingest received SMS
-            await _ingest_inbox(db, modem, info["mm_index"])
+            if info.get("_source") == "zte":
+                await _ingest_zte_inbox(db, modem)
+            else:
+                await _ingest_inbox(db, modem, info["mm_index"])
 
         # Mark modems no longer detected as disconnected
         gone = db.query(Modem).filter(
@@ -93,6 +113,34 @@ async def _poll():
         db.commit()
     finally:
         db.close()
+
+
+async def _ingest_zte_inbox(db: Session, modem: Modem):
+    if not _ZTE_AVAILABLE:
+        return
+    try:
+        messages = await asyncio.get_event_loop().run_in_executor(None, _zte.list_sms)
+    except Exception:
+        return
+    for msg in messages:
+        sms_index = msg["index"]
+        existing = db.query(SmsMessage).filter(
+            SmsMessage.modem_id == modem.id,
+            SmsMessage.mm_sms_index == sms_index,
+            SmsMessage.direction == SmsDirection.INBOUND,
+        ).first()
+        if not existing:
+            sms = SmsMessage(
+                modem_id=modem.id,
+                mm_sms_index=sms_index,
+                direction=SmsDirection.INBOUND,
+                phone_number=msg["number"],
+                content=msg["text"],
+                status=SmsStatus.RECEIVED,
+                received_at=datetime.utcnow(),
+            )
+            db.add(sms)
+    db.commit()
 
 
 async def _ingest_inbox(db: Session, modem: Modem, mm_index: str):

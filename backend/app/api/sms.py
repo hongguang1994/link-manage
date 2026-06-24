@@ -29,12 +29,21 @@ def send_sms(req: SmsSendRequest, db: Session = Depends(get_db), me: User = Depe
     if not modem:
         raise HTTPException(status_code=404, detail="Modem not found")
 
-    match = re.search(r"/Modem/(\d+)$", modem.mm_object_path or "")
-    if not match:
-        raise HTTPException(status_code=503, detail="Modem not available")
-    mm_index = match.group(1)
-
-    success, message = modem_manager.send_sms(mm_index, req.phone_number, req.content)
+    obj_path = modem.mm_object_path or ""
+    if obj_path.startswith("zte:"):
+        # ZTE HTTP driver
+        try:
+            from app.services import zte_http_modem as _zte
+            success = _zte.send_sms(req.phone_number, req.content)
+            message = "" if success else "ZTE device returned failure"
+        except Exception as exc:
+            success, message = False, str(exc)
+    else:
+        match = re.search(r"/Modem/(\d+)$", obj_path)
+        if not match:
+            raise HTTPException(status_code=503, detail="Modem not available")
+        mm_index = match.group(1)
+        success, message = modem_manager.send_sms(mm_index, req.phone_number, req.content)
     sms = SmsMessage(
         modem_id=modem.id,
         direction=SmsDirection.OUTBOUND,

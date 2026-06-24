@@ -87,15 +87,28 @@ async def execute_task(task_id: int):
             return
 
         import re
-        match = re.search(r"/Modem/(\d+)$", modem.mm_object_path)
-        if not match:
-            return
-        mm_index = match.group(1)
+        obj_path = modem.mm_object_path or ""
+        _is_zte = obj_path.startswith("zte:")
+        if not _is_zte:
+            match = re.search(r"/Modem/(\d+)$", obj_path)
+            if not match:
+                return
+            mm_index = match.group(1)
+        else:
+            mm_index = None
 
         recipients = task.recipients if isinstance(task.recipients, list) else []
         fail_count = 0
         for phone_number in recipients:
-            success, message = modem_manager.send_sms(mm_index, phone_number, task.content)
+            if _is_zte:
+                try:
+                    from app.services import zte_http_modem as _zte
+                    _ok = _zte.send_sms(phone_number, task.content)
+                    success, message = _ok, ("" if _ok else "ZTE send failed")
+                except Exception as exc:
+                    success, message = False, str(exc)
+            else:
+                success, message = modem_manager.send_sms(mm_index, phone_number, task.content)
             sms = SmsMessage(
                 modem_id=modem.id,
                 direction=SmsDirection.OUTBOUND,
