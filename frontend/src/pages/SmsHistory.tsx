@@ -17,7 +17,7 @@ function fallbackCopy(text: string, done: () => void) {
   document.body.removeChild(el)
 }
 
-function CopyableContent({ text }: { text: string }) {
+function ContentModal({ text, onClose }: { text: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
   const copy = useCallback(() => {
     const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500) }
@@ -28,20 +28,56 @@ function CopyableContent({ text }: { text: string }) {
     }
   }, [text])
   return (
-    <div className="relative flex items-center gap-2 group max-w-xs">
-      <span className="truncate text-gray-300" title={text}>{text}</span>
-      <button
-        onClick={copy}
-        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-200"
-      >
-        {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-      </button>
-      {copied && (
-        <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-600 text-green-400 text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
-          已复制
-        </span>
-      )}
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 w-full max-w-lg space-y-3" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-400">短信内容</span>
+          <button onClick={copy} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors">
+            {copied ? <><Check className="w-3.5 h-3.5 text-green-400" />已复制</> : <><Copy className="w-3.5 h-3.5" />复制</>}
+          </button>
+        </div>
+        <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap break-all">{text}</p>
+        <div className="flex justify-end">
+          <button onClick={onClose} className="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm">关闭</button>
+        </div>
+      </div>
     </div>
+  )
+}
+
+function CopyableContent({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const copy = useCallback(() => {
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500) }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done))
+    } else {
+      fallbackCopy(text, done)
+    }
+  }, [text])
+  return (
+    <>
+      <div className="relative flex items-center gap-2 group max-w-xs">
+        <span
+          className="truncate text-gray-300 cursor-pointer hover:text-white"
+          title="点击展开全文"
+          onClick={() => setExpanded(true)}
+        >{text}</span>
+        <button
+          onClick={copy}
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-200"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+        {copied && (
+          <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-600 text-green-400 text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+            已复制
+          </span>
+        )}
+      </div>
+      {expanded && <ContentModal text={text} onClose={() => setExpanded(false)} />}
+    </>
   )
 }
 
