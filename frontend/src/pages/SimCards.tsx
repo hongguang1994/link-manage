@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   RefreshCw, Wifi, WifiOff, AlertCircle, HelpCircle,
-  ChevronRight, Upload, Download,
+  ChevronRight, Upload, Download, ClipboardList, Clock, CheckCircle,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { getModemDetailApi, getModemsApi, type Modem, type ModemDetail } from '../api/modems'
 import { useModemStore } from '../store/modemStore'
+import { useAuthStore } from '../store/authStore'
 import { useT } from '../i18n'
+import { mySimRequestsApi, createSimRequestApi, type SimAccessRequest } from '../api/simRequests'
 
 function fmtBytes(bytes: number | null | undefined): string {
   if (!bytes) return '0 B'
@@ -40,10 +42,44 @@ type Row = ModemDetail
 export default function SimCards() {
   const navigate = useNavigate()
   const { modems } = useModemStore()
+  const user = useAuthStore(s => s.user)
+  const perm = useAuthStore(s => s.perm)()
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [myRequests, setMyRequests] = useState<SimAccessRequest[]>([])
+  const [applying, setApplying] = useState<number | null>(null)
   const t = useT()
+
+  const isAdmin = user?.role === 'admin'
+
+  // For non-admin users: determine per-modem access status
+  const hasDirectSendAccess = perm.can_send_sms && perm.allowed_modem_ids === null
+
+  const modemAccessStatus = (modemId: number): 'access' | 'pending' | 'approved' | 'none' => {
+    if (isAdmin || hasDirectSendAccess) return 'access'
+    if (perm.can_send_sms && perm.allowed_modem_ids?.includes(modemId)) return 'access'
+    const req = myRequests.find(r => r.modem_id === modemId)
+    if (!req) return 'none'
+    if (req.status === 'pending') return 'pending'
+    const now = new Date()
+    if (req.status === 'approved' && (!req.expires_at || new Date(req.expires_at) > now)) return 'approved'
+    return 'none'
+  }
+
+  const applyForModem = async (e: React.MouseEvent, modemId: number) => {
+    e.stopPropagation()
+    setApplying(modemId)
+    try {
+      await createSimRequestApi(modemId)
+      const res = await mySimRequestsApi()
+      setMyRequests(res.data)
+    } catch (err: any) {
+      alert(err.response?.data?.detail || '申请失败')
+    } finally {
+      setApplying(null)
+    }
+  }
 
   const regLabel = (state: string | null | undefined): string => {
     if (!state) return t('none')
@@ -72,13 +108,17 @@ export default function SimCards() {
   const load = async () => {
     setLoading(true)
     try {
-      const base = await getModemsApi()
+      const [base, reqRes] = await Promise.all([
+        getModemsApi(),
+        isAdmin ? Promise.resolve({ data: [] }) : mySimRequestsApi(),
+      ])
       const details = await Promise.all(
         base.data.map(m => getModemDetailApi(m.id).then(r => r.data).catch(() => ({
           ...m, sms_sent: 0, sms_received: 0, sms_today: 0,
         } as Row)))
       )
       setRows(details)
+      setMyRequests(reqRes.data)
     } finally {
       setLoading(false)
     }
@@ -210,8 +250,31 @@ export default function SimCards() {
                       {r.sms_today}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    <ChevronRight className="w-4 h-4" />
+                  <td className="px-4 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                    {(() => {
+                      const status = modemAccessStatus(r.id)
+                      if (status === 'access') return <ChevronRight className="w-4 h-4 text-gray-500" onClick={() => navigate(`/modems/${r.id}`)} />
+                      if (status === 'pending') return (
+                        <span className="inline-flex items-center gap-1 text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded-full">
+                          <Clock className="w-3 h-3" /> 审批中
+                        </span>
+                      )
+                      if (status === 'approved') return (
+                        <span className="inline-flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded-full">
+                          <CheckCircle className="w-3 h-3" /> 已授权
+                        </span>
+                      )
+                      return (
+                        <button
+                          onClick={e => applyForModem(e, r.id)}
+                          disabled={applying === r.id}
+                          className="inline-flex items-center gap-1 text-xs text-blue-400 bg-blue-400/10 hover:bg-blue-400/20 px-2 py-1 rounded-full transition-colors disabled:opacity-50"
+                        >
+                          <ClipboardList className="w-3 h-3" />
+                          {applying === r.id ? '提交中...' : '申请使用'}
+                        </button>
+                      )
+                    })()}
                   </td>
                 </tr>
               ))}
