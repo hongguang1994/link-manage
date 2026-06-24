@@ -61,7 +61,8 @@ def _perm(user):
     """Return effective permission object.
     Priority: admin > merged RBAC roles > legacy UserPermission > full-access default.
     Role merging: any True wins for flags; read_only=False if any role allows writes;
-    allowed_modem_ids=None (all) if any role has no restriction, else union of IDs."""
+    allowed_modem_ids=None (all) if any role has no restriction, else union of IDs.
+    Approved SimAccessRequests are merged on top as additional device grants."""
     from app.models.user import UserRole
     from app.models.permission import UserPermission
     if user.role == UserRole.ADMIN:
@@ -82,12 +83,62 @@ def _perm(user):
             modem_ids = None
         else:
             modem_ids = list({mid for r in roles for mid in (r.allowed_modem_ids or [])}) or None
-        return UserPermission(
+        base = UserPermission(
             can_view_sim=view_sim, can_send_sms=send_sms,
             can_manage_tasks=manage, can_view_history=history,
             read_only=ro, allowed_modem_ids=modem_ids,
         )
-    return user.permission
+    else:
+        p = user.permission
+        if p is None:
+            return None
+        # Copy to avoid mutating the ORM object
+        base = UserPermission(
+            can_view_sim=p.can_view_sim, can_send_sms=p.can_send_sms,
+            can_manage_tasks=p.can_manage_tasks, can_view_history=p.can_view_history,
+            read_only=p.read_only,
+            allowed_modem_ids=list(p.allowed_modem_ids) if p.allowed_modem_ids else p.allowed_modem_ids,
+        )
+
+    # Skip merging if user already has unrestricted send_sms
+    if base.can_send_sms and base.allowed_modem_ids is None:
+        return base
+
+    # Merge approved (non-expired) sim access requests
+    _merge_sim_grants(user.id, base)
+    return base
+
+
+def _merge_sim_grants(user_id: int, perm) -> None:
+    """Query approved SimAccessRequests and merge modem IDs into perm in-place."""
+    from app.models.sim_request import SimAccessRequest, RequestStatus
+    from app.core.database import SessionLocal
+    from datetime import datetime
+    from sqlalchemy import or_
+
+    now = datetime.utcnow()
+    db = SessionLocal()
+    try:
+        approved_ids = [
+            r.modem_id for r in db.query(SimAccessRequest.modem_id).filter(
+                SimAccessRequest.user_id == user_id,
+                SimAccessRequest.status == RequestStatus.APPROVED,
+                or_(SimAccessRequest.expires_at.is_(None), SimAccessRequest.expires_at > now),
+            ).all()
+        ]
+    finally:
+        db.close()
+
+    if not approved_ids:
+        return
+
+    perm.can_send_sms = True
+    perm.can_manage_tasks = True
+    if perm.allowed_modem_ids is None:
+        # already unrestricted — no change needed
+        pass
+    else:
+        perm.allowed_modem_ids = list(set(perm.allowed_modem_ids) | set(approved_ids))
 
 
 def require_send_sms(current_user=Depends(get_current_user)):

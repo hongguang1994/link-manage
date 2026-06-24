@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.database import Base, engine
 from app.models import user, permission, support, notification  # ensure tables are created
 from app.models import role as role_model  # ensure roles table is created
+from app.models import sim_request as sim_request_model  # ensure sim_access_requests table is created
 from app.api import modems, sms
 from app.api.auth import router as auth_router
 from app.api.captcha import router as captcha_router
@@ -16,6 +17,7 @@ from app.api.roles import router as roles_router
 from app.api.ws import router as ws_router
 from app.api.support import router as support_router
 from app.api.notifications import router as notifications_router
+from app.api.sim_requests import router as sim_requests_router
 from app.services import modem_poller
 from app.services.sms_scheduler import start as scheduler_start, stop as scheduler_stop
 
@@ -52,6 +54,7 @@ app.include_router(sms.router, prefix="/api")
 app.include_router(ws_router)
 app.include_router(support_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
+app.include_router(sim_requests_router, prefix="/api")
 
 
 @app.get("/api/health")

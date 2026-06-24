@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Send, Clock, MessageSquare, Cpu, CreditCard,
   Users, LogOut, Sun, Moon, Monitor, ChevronDown, User, KeyRound, X, ShieldCheck,
   Wifi, RefreshCw, ArrowUp, MessageCircle, PanelLeftClose, PanelLeftOpen,
-  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText,
+  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText, ClipboardList, ClipboardCheck,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useModemStore } from '../store/modemStore'
@@ -571,6 +571,18 @@ export default function Layout() {
               <NavLink to="/admin/tasks" className={navLinkCls} title={sideCollapsed ? t('nav_admin_tasks') : undefined}>
                 <Activity className="w-4 h-4 shrink-0" />
                 {!sideCollapsed && <span>{t('nav_admin_tasks')}</span>}
+              </NavLink>
+            )}
+            {user?.role === 'admin' && (
+              <NavLink to="/admin/sim-requests" className={navLinkCls} title={sideCollapsed ? 'SIM申请审批' : undefined}>
+                <ClipboardCheck className="w-4 h-4 shrink-0" />
+                {!sideCollapsed && <span>{lang === 'zh' ? 'SIM申请审批' : 'SIM Requests'}</span>}
+              </NavLink>
+            )}
+            {user?.role !== 'admin' && (
+              <NavLink to="/my-requests" className={navLinkCls} title={sideCollapsed ? '我的申请' : undefined}>
+                <ClipboardList className="w-4 h-4 shrink-0" />
+                {!sideCollapsed && <span>{lang === 'zh' ? '我的SIM权限' : 'My SIM Access'}</span>}
               </NavLink>
             )}
             {canSupport() && (
