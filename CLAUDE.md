@@ -37,11 +37,10 @@ npm run preview    # preview production build
 ### Docker (Linux host only)
 
 ```bash
-docker compose up -d   # backend uses host networking for D-Bus/USB access
-# Frontend at http://localhost:3000
+docker compose up -d   # frontend at http://localhost:80
 ```
 
-**Warning**: if you also run the backend as a systemd service, the Docker backend container (which uses `network_mode: host`) will conflict on port 8000. Stop the Docker backend before starting the systemd service: `docker stop simnexus-backend-1 && docker update --restart=no simnexus-backend-1`.
+Both containers run on bridge networking. The backend container accesses the host's ModemManager by mounting `/run/dbus/system_bus_socket` — the host must have ModemManager running. USB devices are bind-mounted at `/dev/bus/usb`.
 
 There are no automated tests in this codebase.
 
