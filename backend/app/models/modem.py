@@ -16,8 +16,8 @@ class Modem(Base):
     __tablename__ = "modems"
 
     id = Column(Integer, primary_key=True, index=True)
-    device_path = Column(String(100), unique=True, nullable=False)  # e.g. /dev/ttyUSB0
-    mm_object_path = Column(String(200))                            # ModemManager D-Bus path
+    device_path = Column(String(100))                               # e.g. /dev/ttyUSB0
+    mm_object_path = Column(String(200), unique=True, nullable=False)  # ModemManager D-Bus path
     imei = Column(String(20), unique=True)
     manufacturer = Column(String(100))
     model = Column(String(100))
@@ -29,6 +29,13 @@ class Modem(Base):
     is_active = Column(Boolean, default=True)
     last_seen = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Extended stats (populated by poller)
+    access_technologies = Column(String(100))   # e.g. "lte", "umts"
+    registration_state = Column(String(50))     # e.g. "home", "roaming"
+    tx_bytes = Column(Integer, default=0)       # bytes sent via bearer
+    rx_bytes = Column(Integer, default=0)       # bytes received via bearer
+    connection_duration = Column(Integer, default=0)  # seconds
 
     sms_messages = relationship("SmsMessage", back_populates="modem")
     scheduled_tasks = relationship("SmsScheduledTask", back_populates="modem")

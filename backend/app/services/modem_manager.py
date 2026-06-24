@@ -54,6 +54,15 @@ def get_modem_info(mm_path: str) -> Optional[Dict[str, Any]]:
         m = data["modem"]
         generic = m.get("generic", {})
         threegpp = m.get("3gpp", {})
+        access_techs = generic.get("access-technologies", [])
+        if isinstance(access_techs, list):
+            access_technologies = ",".join(access_techs)
+        else:
+            access_technologies = str(access_techs)
+
+        reg_state = threegpp.get("registration-state", "") or ""
+
+        bearer_stats = _get_bearer_stats(idx)
         return {
             "mm_object_path": mm_path,
             "mm_index": idx,
@@ -65,10 +74,45 @@ def get_modem_info(mm_path: str) -> Optional[Dict[str, Any]]:
             "signal_quality": int(generic.get("signal-quality", {}).get("value", 0)),
             "status": _map_state(generic.get("state", "unknown")),
             "phone_number": _get_phone_number(idx),
+            "access_technologies": access_technologies,
+            "registration_state": reg_state,
+            "tx_bytes": bearer_stats.get("tx_bytes", 0),
+            "rx_bytes": bearer_stats.get("rx_bytes", 0),
+            "connection_duration": bearer_stats.get("connection_duration", 0),
         }
     except (json.JSONDecodeError, KeyError) as e:
         logger.error(f"Failed to parse modem info: {e}")
         return None
+
+
+def _get_bearer_stats(idx: str) -> dict:
+    """Fetch TX/RX bytes and connection duration from the active bearer."""
+    code, out, _ = _run(["mmcli", "-m", idx, "--list-bearers", "-J"])
+    if code != 0:
+        return {}
+    try:
+        data = json.loads(out)
+        paths = data.get("modem.bearers.dbus-path", []) or data.get("bearer-list", [])
+        if not paths:
+            return {}
+        bearer_path = paths[0]
+        match = re.search(r"/Bearer/(\d+)$", bearer_path)
+        if not match:
+            return {}
+        b_idx = match.group(1)
+        code2, out2, _ = _run(["mmcli", "-b", b_idx, "-J"])
+        if code2 != 0:
+            return {}
+        b = json.loads(out2).get("bearer", {})
+        stats = b.get("stats", {})
+        status = b.get("status", {})
+        return {
+            "tx_bytes": int(stats.get("tx-bytes", 0) or 0),
+            "rx_bytes": int(stats.get("rx-bytes", 0) or 0),
+            "connection_duration": int(status.get("connection-duration", 0) or 0),
+        }
+    except Exception:
+        return {}
 
 
 def _get_phone_number(idx: str) -> str:
@@ -99,10 +143,10 @@ def _map_state(state: str) -> str:
 
 def send_sms(mm_index: str, phone_number: str, text: str) -> tuple[bool, str]:
     """Send an SMS via a specific modem. Returns (success, message)."""
-    cmd = [
-        "mmcli", "-m", mm_index,
-        f"--messaging-create-sms=number={phone_number},text={text}"
-    ]
+    # mmcli parses --messaging-create-sms value on commas; wrap text in quotes
+    # so the internal parser treats everything after text=" as one value.
+    escaped = text.replace('"', '\\"')
+    cmd = ["mmcli", "-m", mm_index, f'--messaging-create-sms=number={phone_number},text="{escaped}"']
     code, out, err = _run(cmd)
     if code != 0:
         return False, err

@@ -1,13 +1,15 @@
 # SimNexus
 
-基于 Debian 的多 USB 4G 模块管理系统，支持多张 SIM 卡统一管理、短信收发和定时自动发送。
+基于 Debian 的多 USB 4G 模块管理系统，支持多张 SIM 卡统一管理、实时状态监控、流量统计、短信收发和定时自动发送。
 
 ## 功能特性
 
-- **多卡管理** — 同时管理多个 USB 4G 调制解调器，自动识别热插拔
-- **实时监控** — WebSocket 实时推送设备状态、信号强度、运营商信息
+- **SIM 卡管理** — 专属管理页面列出所有 SIM 卡的详细信息：网络状态、信号强度、网络制式（5G/4G/3G）、注册状态、运营商、流量统计、在线时长、短信统计
+- **多卡监控** — 同时管理多个 USB 4G 调制解调器，自动识别热插拔
+- **实时推送** — WebSocket 每 5 秒推送设备状态、信号强度、运营商信息
+- **流量统计** — 实时统计每张 SIM 卡的上行/下行流量及 Bearer 连接时长
 - **手动发送** — 选定 SIM 卡后立即发送短信，发送结果实时反馈
-- **收件同步** — 自动拉取各设备收件箱并入库
+- **收件同步** — 自动拉取各设备收件箱并入库，按 `mm_sms_index` 去重
 - **定时任务** — 支持 Cron 表达式（循环）和指定时间（单次）两种模式，支持群发多个号码
 - **短信记录** — 完整的收发历史，支持按设备、方向筛选
 
@@ -43,7 +45,16 @@ sudo bash scripts/setup-debian.sh
 
 > 安装完成后需重新登录，使串口访问权限生效。
 
-### 3. 启动服务
+### 3. 数据库迁移（已有旧版数据库时）
+
+```bash
+cd backend
+python migrate.py
+```
+
+新安装无需执行此步骤，表结构在启动时自动创建。
+
+### 4. 启动服务
 
 **后端**
 
@@ -82,21 +93,22 @@ SimNexus/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── modems.py          # 设备管理接口
+│   │   │   ├── modems.py          # 设备管理接口（含 /detail 详情接口）
 │   │   │   ├── sms.py             # 短信发送、记录、定时任务接口
 │   │   │   └── ws.py              # WebSocket 实时推送
 │   │   ├── core/
 │   │   │   ├── config.py          # 配置项
 │   │   │   └── database.py        # SQLAlchemy 连接
 │   │   ├── models/
-│   │   │   ├── modem.py           # 调制解调器模型
+│   │   │   ├── modem.py           # 调制解调器模型（含流量、网络制式字段）
 │   │   │   └── sms.py             # 短信、模板、定时任务模型
 │   │   ├── schemas/               # Pydantic 请求/响应结构
 │   │   ├── services/
-│   │   │   ├── modem_manager.py   # mmcli 封装（设备信息、发送短信、收件箱）
-│   │   │   ├── modem_poller.py    # 后台轮询，自动同步设备状态
+│   │   │   ├── modem_manager.py   # mmcli 封装（设备信息、Bearer 流量、发送、收件箱）
+│   │   │   ├── modem_poller.py    # 后台轮询，自动同步设备状态和流量统计
 │   │   │   └── sms_scheduler.py   # APScheduler 定时任务引擎
 │   │   └── main.py
+│   ├── migrate.py                 # 数据库迁移脚本（存量数据库新增字段）
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -106,16 +118,31 @@ SimNexus/
 │   │   ├── hooks/                 # useModemSocket（WebSocket）
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx      # 设备总览
+│   │   │   ├── SimCards.tsx       # SIM 卡管理（列表 + 汇总统计）
+│   │   │   ├── SimDetail.tsx      # 单卡详情（信号、流量、短信统计）
 │   │   │   ├── SmsSend.tsx        # 手动发送
 │   │   │   ├── SmsHistory.tsx     # 收发记录
 │   │   │   └── ScheduledTasks.tsx # 定时任务管理
 │   │   └── store/                 # Zustand 全局状态
 │   ├── Dockerfile
 │   └── nginx.conf
+├── docs/
+│   └── sim-cards-mockup.html      # SIM 卡管理页面设计图
 ├── scripts/
 │   └── setup-debian.sh            # 一键初始化脚本
 └── docker-compose.yml
 ```
+
+## 页面说明
+
+| 路径 | 页面 | 说明 |
+|------|------|------|
+| `/` | 总览 | 设备卡片列表，实时在线状态 |
+| `/sim-cards` | SIM 卡管理 | 所有 SIM 卡详细信息表格 |
+| `/modems/:id` | 卡详情 | 单张 SIM 卡完整信息与统计 |
+| `/send` | 发送短信 | 手动选卡发送 |
+| `/history` | 短信记录 | 收发历史查询 |
+| `/tasks` | 定时任务 | Cron 任务管理 |
 
 ## API 接口
 
@@ -125,6 +152,7 @@ SimNexus/
 |------|------|------|
 | GET | `/api/modems/` | 获取所有设备列表 |
 | GET | `/api/modems/{id}` | 获取单个设备详情 |
+| GET | `/api/modems/{id}/detail` | 获取设备详情（含流量、短信统计） |
 | PATCH | `/api/modems/{id}` | 更新设备别名 |
 | POST | `/api/modems/{id}/refresh` | 立即刷新设备状态 |
 
@@ -207,6 +235,10 @@ sudo usermod -aG dialout $USER
 # 手动测试 mmcli 发送
 mmcli -m 0 --messaging-create-sms="number=+8613800138000,text=test"
 ```
+
+**流量统计显示为 0**
+
+Bearer 流量需要 SIM 卡已建立数据连接（状态为 `connected`）。离线或仅注册未连接的设备无 Bearer，流量统计为 0 属正常。
 
 ## 技术栈
 

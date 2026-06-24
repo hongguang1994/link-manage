@@ -14,7 +14,7 @@ class ModemUpdate(ModemBase):
 
 class ModemOut(BaseModel):
     id: int
-    device_path: str
+    device_path: Optional[str]
     mm_object_path: Optional[str]
     imei: Optional[str]
     manufacturer: Optional[str]
@@ -27,5 +27,16 @@ class ModemOut(BaseModel):
     is_active: bool
     last_seen: Optional[datetime]
     created_at: datetime
+    access_technologies: Optional[str]
+    registration_state: Optional[str]
+    tx_bytes: Optional[int]
+    rx_bytes: Optional[int]
+    connection_duration: Optional[int]
 
     model_config = {"from_attributes": True}
+
+
+class ModemDetail(ModemOut):
+    sms_sent: int = 0
+    sms_received: int = 0
+    sms_today: int = 0

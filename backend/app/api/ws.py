@@ -39,5 +39,8 @@ async def modem_status_ws(websocket: WebSocket):
             finally:
                 db.close()
             await asyncio.sleep(5)
-    except WebSocketDisconnect:
-        _clients.remove(websocket)
+    except Exception:
+        pass
+    finally:
+        if websocket in _clients:
+            _clients.remove(websocket)

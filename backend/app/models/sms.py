@@ -38,6 +38,7 @@ class SmsMessage(Base):
     received_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    mm_sms_index = Column(String(20))  # mmcli SMS index, used for inbound dedup
     modem = relationship("Modem", back_populates="sms_messages")
     scheduled_task_id = Column(Integer, ForeignKey("sms_scheduled_tasks.id"), nullable=True)
 

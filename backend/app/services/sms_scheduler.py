@@ -59,13 +59,16 @@ def _schedule_task(task: SmsScheduledTask, db: Session):
         logger.warning(f"Task {task.id} has no schedule, skipping")
         return
 
-    scheduler.add_job(
+    job = scheduler.add_job(
         execute_task,
         trigger=trigger,
         args=[task.id],
         id=job_id,
         replace_existing=True,
     )
+    if job.next_run_time:
+        task.next_run_at = job.next_run_time.replace(tzinfo=None)
+        db.commit()
     logger.info(f"Scheduled task {task.id} ({task.name})")
 
 

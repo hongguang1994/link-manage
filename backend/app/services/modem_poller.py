@@ -54,6 +54,11 @@ async def _poll():
             modem.signal_quality = info.get("signal_quality", 0)
             modem.status = ModemStatus(info.get("status", "unknown"))
             modem.phone_number = info.get("phone_number") or modem.phone_number
+            modem.access_technologies = info.get("access_technologies", "")
+            modem.registration_state = info.get("registration_state", "")
+            modem.tx_bytes = info.get("tx_bytes", 0)
+            modem.rx_bytes = info.get("rx_bytes", 0)
+            modem.connection_duration = info.get("connection_duration", 0)
             modem.last_seen = datetime.utcnow()
             modem.is_active = True
             db.commit()
@@ -74,15 +79,16 @@ async def _poll():
 async def _ingest_inbox(db: Session, modem: Modem, mm_index: str):
     messages = modem_manager.list_inbox(mm_index)
     for msg in messages:
+        sms_index = msg["sms_index"]
         existing = db.query(SmsMessage).filter(
             SmsMessage.modem_id == modem.id,
-            SmsMessage.phone_number == msg["phone_number"],
-            SmsMessage.content == msg["content"],
+            SmsMessage.mm_sms_index == sms_index,
             SmsMessage.direction == SmsDirection.INBOUND,
         ).first()
         if not existing:
             sms = SmsMessage(
                 modem_id=modem.id,
+                mm_sms_index=sms_index,
                 direction=SmsDirection.INBOUND,
                 phone_number=msg["phone_number"],
                 content=msg["content"],

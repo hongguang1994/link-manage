@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SimNexus — SIM 卡管理设计图</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0f1e; display: flex; align-items: flex-start; justify-content: center; min-height: 100vh; padding: 32px 16px; }
+    .shell { display: flex; width: 1100px; height: 700px; border: 0.5px solid rgba(255,255,255,.1); border-radius: 14px; overflow: hidden; background: #0f172a; box-shadow: 0 24px 64px rgba(0,0,0,.6); }
+    .sidebar { width: 200px; background: #111827; border-right: 0.5px solid rgba(255,255,255,.07); display: flex; flex-direction: column; padding: 20px 12px; flex-shrink: 0; }
+    .logo { display: flex; align-items: center; gap: 8px; padding: 0 8px; margin-bottom: 24px; }
+    .logo-icon { width: 28px; height: 28px; border-radius: 6px; background: #3b82f6; display: flex; align-items: center; justify-content: center; }
+    .logo-icon i { font-size: 16px; color: #fff; }
+    .logo-text { font-size: 15px; font-weight: 500; color: #fff; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; font-size: 13px; color: #9ca3af; margin-bottom: 2px; cursor: pointer; }
+    .nav-item.active { background: #2563eb; color: #fff; }
+    .nav-item:not(.active):hover { background: rgba(255,255,255,.05); color: #e5e7eb; }
+    .nav-item i { font-size: 16px; }
+    .sidebar-footer { margin-top: auto; border-top: 0.5px solid rgba(255,255,255,.07); padding-top: 12px; padding-left: 8px; font-size: 12px; color: #6b7280; }
+    .sidebar-footer span { color: #4ade80; }
+    .main { flex: 1; overflow: auto; background: #0f172a; padding: 24px; }
+    .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
+    .page-title { font-size: 20px; font-weight: 500; color: #f1f5f9; }
+    .page-sub { font-size: 13px; color: #64748b; margin-top: 3px; }
+    .page-sub span { color: #4ade80; }
+    .refresh-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; background: #1e293b; border: 0.5px solid rgba(255,255,255,.1); border-radius: 8px; font-size: 13px; color: #94a3b8; cursor: pointer; font-family: inherit; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: #1e293b; border: 0.5px solid rgba(255,255,255,.07); border-radius: 10px; padding: 14px 16px; }
+    .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+    .stat-value { font-size: 22px; font-weight: 500; }
+    .c-blue { color: #60a5fa; } .c-green { color: #4ade80; } .c-orange { color: #fb923c; } .c-purple { color: #a78bfa; }
+    .table-wrap { background: #1e293b; border: 0.5px solid rgba(255,255,255,.07); border-radius: 10px; overflow: hidden; }
+    .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .tbl thead tr { background: #162032; }
+    .tbl th { padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; color: #64748b; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+    .tbl td { padding: 10px 14px; border-top: 0.5px solid rgba(255,255,255,.05); color: #cbd5e1; white-space: nowrap; vertical-align: middle; }
+    .tbl tr:hover td { background: rgba(255,255,255,.02); }
+    .sim-name { font-size: 13px; font-weight: 500; color: #f1f5f9; }
+    .sim-sub { font-size: 11px; color: #475569; margin-top: 2px; font-family: 'SF Mono', 'Fira Code', monospace; }
+    .badge-status { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .dot-green { background: #4ade80; } .dot-gray { background: #475569; } .dot-red { background: #f87171; }
+    .tag-tech { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; font-weight: 500; background: rgba(59,130,246,.15); color: #60a5fa; font-family: 'SF Mono', monospace; }
+    .tag-roam { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; background: rgba(251,146,60,.12); color: #fb923c; }
+    .tag-home { display: inline-block; padding: 2px 7px; border-radius: 5px; font-size: 11px; background: rgba(74,222,128,.1); color: #4ade80; }
+    .signal-wrap { display: flex; align-items: flex-end; gap: 2px; height: 14px; }
+    .bar { width: 5px; border-radius: 2px; }
+    .bar-on-g { background: #4ade80; } .bar-on-y { background: #facc15; } .bar-on-r { background: #f87171; } .bar-off { background: #334155; }
+    .traffic { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; }
+    .traffic i { font-size: 13px; }
+    .sms-badge { display: inline-block; min-width: 24px; text-align: center; padding: 1px 6px; border-radius: 20px; font-size: 11px; }
+    .sms-hot { background: rgba(251,146,60,.15); color: #fb923c; }
+    .sms-zero { color: #475569; }
+    .chevron { color: #334155; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon"><i class="ti ti-cpu"></i></div>
+        <span class="logo-text">SimNexus</span>
+      </div>
+      <nav>
+        <div class="nav-item"><i class="ti ti-layout-dashboard"></i>总览</div>
+        <div class="nav-item active"><i class="ti ti-credit-card"></i>SIM 卡管理</div>
+        <div class="nav-item"><i class="ti ti-send"></i>发送短信</div>
+        <div class="nav-item"><i class="ti ti-message"></i>短信记录</div>
+        <div class="nav-item"><i class="ti ti-clock"></i>定时任务</div>
+      </nav>
+      <div class="sidebar-footer">设备在线：<span>4</span> / 6</div>
+    </aside>
+
+    <main class="main">
+      <div class="page-header">
+        <div>
+          <div class="page-title">SIM 卡管理</div>
+          <div class="page-sub">共 6 张卡 · 在线 <span>4</span></div>
+        </div>
+        <button class="refresh-btn"><i class="ti ti-refresh"></i>刷新</button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">总 SIM 卡</div><div class="stat-value c-blue">6</div></div>
+        <div class="stat-card"><div class="stat-label">网络在线</div><div class="stat-value c-green">4</div></div>
+        <div class="stat-card"><div class="stat-label">今日短信</div><div class="stat-value c-orange">128</div></div>
+        <div class="stat-card"><div class="stat-label">总上行流量</div><div class="stat-value c-purple">2.4 GB</div></div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>SIM 卡</th><th>状态</th><th>运营商</th><th>网络</th><th>注册</th>
+              <th>信号</th><th>上行</th><th>下行</th><th>在线时长</th>
+              <th>发送</th><th>接收</th><th>今日</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="sim-name">业务卡 A</div><div class="sim-sub">+86 138 0013 8000</div></td>
+              <td><span class="badge-status"><span class="dot dot-green"></span><span style="color:#4ade80">在线</span></span></td>
+              <td>中国移动</td><td><span class="tag-tech">4G</span></td><td><span class="tag-home">归属网络</span></td>
+              <td><div class="signal-wrap">
+                <div class="bar bar-on-g" style="height:3px"></div><div class="bar bar-on-g" style="height:5px"></div>
+                <div class="bar bar-on-g" style="height:8px"></div><div class="bar bar-on-g" style="height:11px"></div>
+                <div class="bar bar-on-g" style="height:14px"></div>
+                <span style="margin-left:5px;font-size:11px;color:#94a3b8">96%</span>
+              </div></td>
+              <td><span class="traffic" style="color:#fb923c"><i class="ti ti-arrow-up"></i>412 MB</span></td>
+              <td><span class="traffic" style="color:#a78bfa"><i class="ti ti-arrow-down"></i>1.2 GB</span></td>
+              <td>2天14时</td><td>342</td><td>58</td>
+              <td><span class="sms-badge sms-hot">43</span></td>
+              <td><i class="ti ti-chevron-right chevron"></i></td>
+            </tr>
+            <tr>
+              <td><div class="sim-name">备用卡 B</div><div class="sim-sub">+86 139 0013 9001</div></td>
+              <td><span class="badge-status"><span class="dot dot-green"></span><span style="color:#4ade80">在线</span></span></td>
+              <td>中国联通</td><td><span class="tag-tech">4G</span></td><td><span class="tag-home">归属网络</span></td>
+              <td><div class="signal-wrap">
+                <div class="bar bar-on-g" style="height:3px"></div><div class="bar bar-on-g" style="height:5px"></div>
+                <div class="bar bar-on-g" style="height:8px"></div><div class="bar bar-on-y" style="height:11px"></div>
+                <div class="bar bar-off" style="height:14px"></div>
+                <span style="margin-left:5px;font-size:11px;color:#94a3b8">72%</span>
+              </div></td>
+              <td><span class="traffic" style="color:#fb923c"><i class="ti ti-arrow-up"></i>88 MB</span></td>
+              <td><span class="traffic" style="color:#a78bfa"><i class="ti ti-arrow-down"></i>320 MB</span></td>
+              <td>1天3时</td><td>120</td><td>22</td>
+              <td><span class="sms-badge sms-hot">31</span></td>
+              <td><i class="ti ti-chevron-right chevron"></i></td>
+            </tr>
+            <tr>
+              <td><div class="sim-name">SIM 3</div><div class="sim-sub">+86 150 0015 0002</div></td>
+              <td><span class="badge-status"><span class="dot dot-green"></span><span style="color:#4ade80">在线</span></span></td>
+              <td>中国电信</td><td><span class="tag-tech">5G</span></td><td><span class="tag-roam">漫游</span></td>
+              <td><div class="signal-wrap">
+                <div class="bar bar-on-g" style="height:3px"></div><div class="bar bar-on-g" style="height:5px"></div>
+                <div class="bar bar-on-g" style="height:8px"></div><div class="bar bar-on-g" style="height:11px"></div>
+                <div class="bar bar-off" style="height:14px"></div>
+                <span style="margin-left:5px;font-size:11px;color:#94a3b8">85%</span>
+              </div></td>
+              <td><span class="traffic" style="color:#fb923c"><i class="ti ti-arrow-up"></i>1.1 GB</span></td>
+              <td><span class="traffic" style="color:#a78bfa"><i class="ti ti-arrow-down"></i>3.8 GB</span></td>
+              <td>5天22时</td><td>891</td><td>114</td>
+              <td><span class="sms-badge sms-hot">54</span></td>
+              <td><i class="ti ti-chevron-right chevron"></i></td>
+            </tr>
+            <tr>
+              <td><div class="sim-name">测试卡 D</div><div class="sim-sub">+86 177 0017 7003</div></td>
+              <td><span class="badge-status"><span class="dot dot-green"></span><span style="color:#4ade80">在线</span></span></td>
+              <td>中国移动</td><td><span class="tag-tech">3G</span></td><td><span class="tag-home">归属网络</span></td>
+              <td><div class="signal-wrap">
+                <div class="bar bar-on-r" style="height:3px"></div><div class="bar bar-on-r" style="height:5px"></div>
+                <div class="bar bar-off" style="height:8px"></div><div class="bar bar-off" style="height:11px"></div>
+                <div class="bar bar-off" style="height:14px"></div>
+                <span style="margin-left:5px;font-size:11px;color:#94a3b8">31%</span>
+              </div></td>
+              <td><span class="traffic" style="color:#fb923c"><i class="ti ti-arrow-up"></i>12 MB</span></td>
+              <td><span class="traffic" style="color:#a78bfa"><i class="ti ti-arrow-down"></i>44 MB</span></td>
+              <td>9时20分</td><td>0</td><td>0</td>
+              <td><span class="sms-zero">0</span></td>
+              <td><i class="ti ti-chevron-right chevron"></i></td>
+            </tr>
+            <tr>
+              <td><div class="sim-name">SIM 5</div><div class="sim-sub" style="color:#334155">未获取号码</div></td>
+              <td><span class="badge-status"><span class="dot dot-gray"></span><span style="color:#64748b">离线</span></span></td>
+              <td style="color:#475569">—</td><td><span style="color:#334155;font-size:11px">—</span></td><td><span style="color:#334155;font-size:11px">—</span></td>
+              <td><div class="signal-wrap">
+                <div class="bar bar-off" style="height:3px"></div><div class="bar bar-off" style="height:5px"></div>
+                <div class="bar bar-off" style="height:8px"></div><div class="bar bar-off" style="height:11px"></div>
+                <div class="bar bar-off" style="height:14px"></div>
+                <span style="margin-left:5px;font-size:11px;color:#334155">0%</span>
+              </div></td>
+              <td style="color:#334155">—</td><td style="color:#334155">—</td><td style="color:#334155">—</td>
+              <td style="color:#475569">7</td><td style="color:#475569">0</td>
+              <td><span class="sms-zero">0</span></td>
+              <td><i class="ti ti-chevron-right chevron"></i></td>
+            </tr>
+            <tr>
+              <td><div class="sim-name">SIM 6</div><div class="sim-sub" style="color:#334155">IMEI: 86101503…</div></td>
+              <td><span class="badge-status"><span class="dot dot-red"></span><span style="color:#f87171">错误</span></span></td>
+              <td style="color:#475569">中国联通</td><td><span class="tag-tech">4G</span></td><td><span style="color:#f87171;font-size:11px">被拒绝</span></td>
+              <td><div class="signal-wrap">
+                <div class="bar bar-on-r" style="height:3px"></div><div class="bar bar-off" style="height:5px"></div>
+                <div class="bar bar-off" style="height:8px"></div><div class="bar bar-off" style="height:11px"></div>
+                <div class="bar bar-off" style="height:14px"></div>
+                <span style="margin-left:5px;font-size:11px;color:#94a3b8">18%</span>
+              </div></td>
+              <td style="color:#334155">—</td><td style="color:#334155">—</td><td style="color:#334155">—</td>
+              <td style="color:#475569">3</td><td style="color:#475569">1</td>
+              <td><span class="sms-zero">0</span></td>
+              <td><i class="ti ti-chevron-right chevron"></i></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

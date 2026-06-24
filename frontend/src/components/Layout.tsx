@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, Send, Clock, MessageSquare, Cpu } from 'lucide-react'
+import { LayoutDashboard, Send, Clock, MessageSquare, Cpu, CreditCard } from 'lucide-react'
 import { useModemStore } from '../store/modemStore'
 import { useModemSocket } from '../hooks/useModemSocket'
 import clsx from 'clsx'
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '总览' },
+  { to: '/sim-cards', icon: CreditCard, label: 'SIM 卡管理' },
   { to: '/send', icon: Send, label: '发送短信' },
   { to: '/history', icon: MessageSquare, label: '短信记录' },
   { to: '/tasks', icon: Clock, label: '定时任务' },
