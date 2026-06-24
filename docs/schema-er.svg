@@ -1,0 +1,233 @@
+<svg viewBox="0 0 900 680" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace,monospace" font-size="12">
+  <rect width="900" height="680" fill="#0d0d14"/>
+  <defs>
+    <marker id="fk" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 z" fill="#555"/>
+    </marker>
+    <marker id="fk-red" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 z" fill="#ef4444"/>
+    </marker>
+    <marker id="fk-blue" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 z" fill="#3b82f6"/>
+    </marker>
+    <marker id="fk-green" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 z" fill="#22c55e"/>
+    </marker>
+    <marker id="fk-yellow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 z" fill="#eab308"/>
+    </marker>
+    <marker id="fk-purple" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L10,4 z" fill="#a855f7"/>
+    </marker>
+  </defs>
+
+  <!-- ===== users ===== -->
+  <g>
+    <rect x="30" y="30" width="180" height="175" rx="5" fill="#111" stroke="#3b82f6" stroke-width="2"/>
+    <rect x="30" y="30" width="180" height="26" rx="5" fill="#1d4ed8"/>
+    <rect x="30" y="50" width="180" height="6" fill="#1d4ed8"/>
+    <text x="120" y="47" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">users</text>
+    <text x="44" y="74" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="44" y="91" fill="#aaa" font-size="11">username</text>
+    <text x="44" y="108" fill="#aaa" font-size="11">password_hash</text>
+    <text x="44" y="125" fill="#aaa" font-size="11">role  (admin|user)</text>
+    <text x="44" y="142" fill="#aaa" font-size="11">is_active</text>
+    <text x="44" y="159" fill="#aaa" font-size="11">created_at</text>
+    <text x="44" y="176" fill="#aaa" font-size="11">updated_at</text>
+  </g>
+
+  <!-- ===== roles ===== -->
+  <g>
+    <rect x="30" y="240" width="180" height="225" rx="5" fill="#111" stroke="#22c55e" stroke-width="2"/>
+    <rect x="30" y="240" width="180" height="26" rx="5" fill="#15803d"/>
+    <rect x="30" y="260" width="180" height="6" fill="#15803d"/>
+    <text x="120" y="257" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">roles</text>
+    <text x="44" y="283" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="44" y="300" fill="#aaa" font-size="11">name</text>
+    <text x="44" y="317" fill="#aaa" font-size="11">description</text>
+    <text x="44" y="334" fill="#aaa" font-size="11">is_system</text>
+    <text x="44" y="351" fill="#aaa" font-size="11">can_view_sim</text>
+    <text x="44" y="368" fill="#aaa" font-size="11">can_send_sms</text>
+    <text x="44" y="385" fill="#aaa" font-size="11">can_manage_tasks</text>
+    <text x="44" y="402" fill="#aaa" font-size="11">can_view_history</text>
+    <text x="44" y="419" fill="#aaa" font-size="11">read_only</text>
+    <text x="44" y="436" fill="#aaa" font-size="11">can_support</text>
+    <text x="44" y="453" fill="#aaa" font-size="11">allowed_modem_ids (JSON)</text>
+  </g>
+
+  <!-- ===== user_roles ===== -->
+  <g>
+    <rect x="255" y="130" width="145" height="75" rx="5" fill="#111" stroke="#a855f7" stroke-width="2"/>
+    <rect x="255" y="130" width="145" height="26" rx="5" fill="#7e22ce"/>
+    <rect x="255" y="150" width="145" height="6" fill="#7e22ce"/>
+    <text x="327" y="147" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">user_roles</text>
+    <text x="269" y="170" fill="#f59e0b" font-size="11">🔑 user_id  →  users.id</text>
+    <text x="269" y="187" fill="#f59e0b" font-size="11">🔑 role_id  →  roles.id</text>
+  </g>
+
+  <!-- ===== user_permissions ===== -->
+  <g>
+    <rect x="30" y="500" width="195" height="160" rx="5" fill="#111" stroke="#f97316" stroke-width="1.5" stroke-dasharray="5,3"/>
+    <rect x="30" y="500" width="195" height="26" rx="5" fill="#7c2d12" opacity="0.8"/>
+    <rect x="30" y="520" width="195" height="6" fill="#7c2d12" opacity="0.8"/>
+    <text x="127" y="517" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">user_permissions</text>
+    <text x="44" y="540" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="44" y="557" fill="#ef4444" font-size="11">🔗 user_id  →  users.id</text>
+    <text x="44" y="574" fill="#aaa" font-size="11">can_view_sim</text>
+    <text x="44" y="591" fill="#aaa" font-size="11">can_send_sms</text>
+    <text x="44" y="608" fill="#aaa" font-size="11">can_manage_tasks</text>
+    <text x="44" y="625" fill="#aaa" font-size="11">can_view_history</text>
+    <text x="44" y="642" fill="#aaa" font-size="11">read_only  /  allowed_modem_ids</text>
+    <text x="44" y="655" fill="#666" font-size="10">（旧版兜底，新用户优先 RBAC）</text>
+  </g>
+
+  <!-- ===== modems ===== -->
+  <g>
+    <rect x="460" y="30" width="190" height="225" rx="5" fill="#111" stroke="#eab308" stroke-width="2"/>
+    <rect x="460" y="30" width="190" height="26" rx="5" fill="#854d0e"/>
+    <rect x="460" y="50" width="190" height="6" fill="#854d0e"/>
+    <text x="555" y="47" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">modems</text>
+    <text x="474" y="74" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="474" y="91" fill="#aaa" font-size="11">mm_object_path  (唯一键)</text>
+    <text x="474" y="108" fill="#aaa" font-size="11">device_path</text>
+    <text x="474" y="125" fill="#aaa" font-size="11">imei</text>
+    <text x="474" y="142" fill="#aaa" font-size="11">manufacturer / model</text>
+    <text x="474" y="159" fill="#aaa" font-size="11">phone_number / operator</text>
+    <text x="474" y="176" fill="#aaa" font-size="11">signal_quality / status</text>
+    <text x="474" y="193" fill="#aaa" font-size="11">access_technologies</text>
+    <text x="474" y="210" fill="#aaa" font-size="11">tx_bytes / rx_bytes</text>
+    <text x="474" y="227" fill="#aaa" font-size="11">connection_duration</text>
+    <text x="474" y="244" fill="#aaa" font-size="11">alias / is_active / last_seen</text>
+  </g>
+
+  <!-- ===== sms_messages ===== -->
+  <g>
+    <rect x="460" y="290" width="195" height="195" rx="5" fill="#111" stroke="#ef4444" stroke-width="2"/>
+    <rect x="460" y="290" width="195" height="26" rx="5" fill="#991b1b"/>
+    <rect x="460" y="310" width="195" height="6" fill="#991b1b"/>
+    <text x="557" y="307" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">sms_messages</text>
+    <text x="474" y="330" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="474" y="347" fill="#ef4444" font-size="11">🔗 modem_id  →  modems.id</text>
+    <text x="474" y="364" fill="#ef4444" font-size="11">🔗 created_by_id  →  users.id</text>
+    <text x="474" y="381" fill="#ef4444" font-size="11">🔗 scheduled_task_id  →  tasks.id</text>
+    <text x="474" y="398" fill="#aaa" font-size="11">direction  (inbound|outbound)</text>
+    <text x="474" y="415" fill="#aaa" font-size="11">phone_number / content</text>
+    <text x="474" y="432" fill="#aaa" font-size="11">status  (sent|failed|received)</text>
+    <text x="474" y="449" fill="#aaa" font-size="11">mm_sms_index  (收件去重)</text>
+    <text x="474" y="466" fill="#aaa" font-size="11">sent_at / received_at</text>
+  </g>
+
+  <!-- ===== sms_scheduled_tasks ===== -->
+  <g>
+    <rect x="680" y="180" width="200" height="210" rx="5" fill="#111" stroke="#06b6d4" stroke-width="2"/>
+    <rect x="680" y="180" width="200" height="26" rx="5" fill="#155e75"/>
+    <rect x="680" y="200" width="200" height="6" fill="#155e75"/>
+    <text x="780" y="197" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">sms_scheduled_tasks</text>
+    <text x="694" y="220" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="694" y="237" fill="#ef4444" font-size="11">🔗 modem_id  →  modems.id</text>
+    <text x="694" y="254" fill="#ef4444" font-size="11">🔗 created_by_id  →  users.id</text>
+    <text x="694" y="271" fill="#aaa" font-size="11">name</text>
+    <text x="694" y="288" fill="#aaa" font-size="11">recipients  (JSON)</text>
+    <text x="694" y="305" fill="#aaa" font-size="11">content</text>
+    <text x="694" y="322" fill="#aaa" font-size="11">cron_expression</text>
+    <text x="694" y="339" fill="#aaa" font-size="11">send_once_at</text>
+    <text x="694" y="356" fill="#aaa" font-size="11">status / run_count</text>
+    <text x="694" y="373" fill="#aaa" font-size="11">last_run_at / next_run_at</text>
+  </g>
+
+  <!-- ===== sms_templates ===== -->
+  <g>
+    <rect x="680" y="415" width="195" height="105" rx="5" fill="#111" stroke="#555" stroke-width="1.5"/>
+    <rect x="680" y="415" width="195" height="26" rx="5" fill="#292929"/>
+    <rect x="680" y="435" width="195" height="6" fill="#292929"/>
+    <text x="777" y="432" text-anchor="middle" fill="#ccc" font-weight="700" font-size="13">sms_templates</text>
+    <text x="694" y="455" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="694" y="472" fill="#aaa" font-size="11">name / content</text>
+    <text x="694" y="489" fill="#aaa" font-size="11">variables  (JSON)</text>
+    <text x="694" y="506" fill="#666" font-size="10">（独立，无外键关联）</text>
+  </g>
+
+  <!-- ===== notifications ===== -->
+  <g>
+    <rect x="255" y="430" width="190" height="175" rx="5" fill="#111" stroke="#f97316" stroke-width="2"/>
+    <rect x="255" y="430" width="190" height="26" rx="5" fill="#9a3412"/>
+    <rect x="255" y="450" width="190" height="6" fill="#9a3412"/>
+    <text x="350" y="447" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">notifications</text>
+    <text x="269" y="470" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="269" y="487" fill="#aaa" font-size="11">type / title / body</text>
+    <text x="269" y="504" fill="#aaa" font-size="11">is_read</text>
+    <text x="269" y="521" fill="#aaa" font-size="11">audience</text>
+    <text x="269" y="538" fill="#888" font-size="10">  admin | support | all | user</text>
+    <text x="269" y="555" fill="#aaa" font-size="11">target_user_id  (软引用)</text>
+    <text x="269" y="572" fill="#888" font-size="10">  audience=user 时指定接收者</text>
+    <text x="269" y="589" fill="#aaa" font-size="11">created_at</text>
+  </g>
+
+  <!-- ===== support_messages ===== -->
+  <g>
+    <rect x="255" y="240" width="190" height="170" rx="5" fill="#111" stroke="#a855f7" stroke-width="2"/>
+    <rect x="255" y="240" width="190" height="26" rx="5" fill="#6b21a8"/>
+    <rect x="255" y="260" width="190" height="6" fill="#6b21a8"/>
+    <text x="350" y="257" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">support_messages</text>
+    <text x="269" y="280" fill="#f59e0b" font-size="11">🔑 id</text>
+    <text x="269" y="297" fill="#ef4444" font-size="11">🔗 user_id  →  users.id</text>
+    <text x="269" y="314" fill="#ef4444" font-size="11">🔗 sender_id  →  users.id</text>
+    <text x="269" y="331" fill="#aaa" font-size="11">content</text>
+    <text x="269" y="348" fill="#aaa" font-size="11">is_from_user / is_read</text>
+    <text x="269" y="365" fill="#aaa" font-size="11">attachment_url</text>
+    <text x="269" y="382" fill="#aaa" font-size="11">attachment_name / _type</text>
+    <text x="269" y="399" fill="#aaa" font-size="11">created_at</text>
+  </g>
+
+  <!-- ==== RELATIONSHIPS ==== -->
+
+  <!-- users -> user_roles -->
+  <line x1="210" y1="118" x2="255" y2="155" stroke="#a855f7" stroke-width="1.5" marker-end="url(#fk-purple)"/>
+  <!-- roles -> user_roles -->
+  <line x1="210" y1="315" x2="255" y2="185" stroke="#a855f7" stroke-width="1.5" marker-end="url(#fk-purple)"/>
+
+  <!-- users -> user_permissions (1:1) -->
+  <line x1="120" y1="205" x2="120" y2="498" stroke="#f97316" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#fk)"/>
+
+  <!-- users -> support_messages.user_id -->
+  <line x1="210" y1="80" x2="255" y2="297" stroke="#a855f7" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#fk-purple)"/>
+  <!-- users -> support_messages.sender_id -->
+  <line x1="210" y1="95" x2="255" y2="314" stroke="#a855f7" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#fk-purple)"/>
+
+  <!-- users -> sms_messages.created_by_id -->
+  <line x1="210" y1="140" x2="460" y2="364" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#fk-red)"/>
+
+  <!-- users -> sms_scheduled_tasks.created_by_id -->
+  <line x1="210" y1="160" x2="680" y2="254" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#fk-red)"/>
+
+  <!-- modems -> sms_messages -->
+  <line x1="555" y1="255" x2="555" y2="288" stroke="#ef4444" stroke-width="1.5" marker-end="url(#fk-red)"/>
+
+  <!-- modems -> sms_scheduled_tasks -->
+  <line x1="650" y1="142" x2="680" y2="237" stroke="#06b6d4" stroke-width="1.5" marker-end="url(#fk-blue)"/>
+
+  <!-- sms_scheduled_tasks -> sms_messages.scheduled_task_id -->
+  <line x1="680" y1="320" x2="655" y2="381" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#fk-red)"/>
+
+  <!-- Legend -->
+  <rect x="460" y="525" width="220" height="135" rx="5" fill="#111" stroke="#333" stroke-width="1"/>
+  <text x="474" y="545" fill="#aaa" font-size="11" font-weight="600">图例</text>
+  <line x1="474" y1="560" x2="510" y2="560" stroke="#555" stroke-width="1.5" marker-end="url(#fk)"/>
+  <text x="518" y="564" fill="#888" font-size="10">外键（强关联）</text>
+  <line x1="474" y1="578" x2="510" y2="578" stroke="#555" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#fk)"/>
+  <text x="518" y="582" fill="#888" font-size="10">外键（可选/软引用）</text>
+  <line x1="474" y1="596" x2="510" y2="596" stroke="#f97316" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#fk)"/>
+  <text x="518" y="600" fill="#888" font-size="10">旧版兜底关联</text>
+  <rect x="474" y="609" width="10" height="10" rx="2" fill="#111" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="490" y="619" fill="#888" font-size="10">用户认证</text>
+  <rect x="474" y="626" width="10" height="10" rx="2" fill="#111" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="490" y="636" fill="#888" font-size="10">RBAC 角色</text>
+  <rect x="554" y="609" width="10" height="10" rx="2" fill="#111" stroke="#eab308" stroke-width="1.5"/>
+  <text x="570" y="619" fill="#888" font-size="10">设备</text>
+  <rect x="554" y="626" width="10" height="10" rx="2" fill="#111" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="570" y="636" fill="#888" font-size="10">短信/任务</text>
+  <rect x="610" y="609" width="10" height="10" rx="2" fill="#111" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="626" y="619" fill="#888" font-size="10">客服消息</text>
+  <rect x="610" y="626" width="10" height="10" rx="2" fill="#111" stroke="#f97316" stroke-width="1.5"/>
+  <text x="626" y="636" fill="#888" font-size="10">通知/权限</text>
+</svg>
