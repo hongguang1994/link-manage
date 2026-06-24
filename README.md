@@ -92,14 +92,93 @@ npm run dev
 
 访问 [http://localhost:5173](http://localhost:5173)
 
-### 4. Docker 部署（Linux 宿主机）
+### 4. Docker 部署（Linux 宿主机，推荐）
+
+**前提条件**
+
+- 宿主机已安装并运行 ModemManager：
+
+  ```bash
+  sudo apt install modemmanager
+  sudo systemctl enable --now ModemManager
+  systemctl status ModemManager   # 确认 active (running)
+  ```
+
+- 宿主机已安装 Docker 和 Docker Compose：
+
+  ```bash
+  docker --version
+  docker compose version
+  ```
+
+**启动**
 
 ```bash
+git clone https://github.com/hongguang1994/SimNexus.git
+cd SimNexus
 docker compose up -d
 ```
 
-> 后端使用 `host` 网络模式以访问 D-Bus 和 USB 设备，必须在 Linux 宿主机上运行。  
-> 前端访问地址：[http://localhost:3000](http://localhost:3000)
+首次启动会自动构建镜像（约 2–3 分钟），之后访问 `http://<服务器IP>`。
+
+**网络架构**
+
+两个容器均运行在 Docker bridge 网络（`simnexus_default`）中：
+
+```
+浏览器
+  ↓ :80
+simnexus-frontend（nginx）
+  ├── GET /、/login 等  →  返回静态文件（React SPA）
+  ├── GET /api/*        →  proxy_pass → simnexus-backend:8000
+  └── WS  /ws/*         →  proxy_pass → simnexus-backend:8000（WebSocket）
+```
+
+backend 容器通过挂载宿主机 D-Bus socket（`/run/dbus/system_bus_socket`）与宿主机的 ModemManager 通信，**不在容器内启动 ModemManager**。
+
+**数据持久化**
+
+SQLite 数据库和上传文件存储在宿主机的 `./data/` 目录，容器重建后数据不丢失：
+
+```
+SimNexus/
+└── data/
+    └── sim_manager.db
+```
+
+**常用运维命令**
+
+```bash
+# 查看运行状态
+docker compose ps
+
+# 查看日志
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# 重启服务
+docker compose restart
+
+# 停止服务
+docker compose down
+
+# 更新代码后重新构建
+git pull
+docker compose build
+docker compose up -d
+```
+
+**旧版 systemd 服务迁移**
+
+如果服务器之前使用 systemd + 宿主机 nginx 部署，需先停止旧服务再启动 Docker：
+
+```bash
+sudo systemctl stop nginx simnexus
+sudo systemctl disable nginx simnexus
+docker compose up -d
+```
+
+> Docker backend 容器如果设置了 `network_mode: host`，会与宿主机 8000 端口冲突。当前版本已改为 bridge 网络，不存在此问题。
 
 ---
 
