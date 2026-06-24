@@ -24,7 +24,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
-      <aside className="w-56 bg-gray-850 border-r border-gray-700 flex flex-col py-6 px-3 shrink-0" style={{ background: '#111827' }}>
+      <aside className="w-56 border-r border-gray-700 flex flex-col py-6 px-3 shrink-0 h-screen sticky top-0 overflow-y-auto" style={{ background: '#111827' }}>
         <div className="flex items-center gap-2 px-3 mb-8">
           <Cpu className="w-6 h-6 text-blue-400" />
           <span className="font-bold text-white text-lg">SimNexus</span>
