@@ -7,8 +7,10 @@
 ### 设备与通信
 - **SIM 卡管理** — 列出所有 SIM 卡的网络状态、信号强度、网络制式（5G/4G/3G）、注册状态、运营商、流量统计、在线时长、短信统计
 - **多卡监控** — 同时管理多个 USB 4G 调制解调器，自动识别热插拔
+- **ZTE 随身 WiFi 支持** — 通过 HTTP goform API 管理 ZTE 随身 WiFi（无需 mmcli），自动发现、状态轮询、短信收发，IMSI 推断运营商名称
 - **实时推送** — WebSocket 每 5 秒推送设备状态、信号强度、运营商信息
-- **手动发送** — 选定 SIM 卡后立即发送短信
+- **手动发送** — 选定 SIM 卡后立即发送短信，支持从模板选择内容
+- **短信模板** — 创建可复用模板，支持 `{变量名}` 占位符，发送时逐一填写变量值并实时预览
 - **收件同步** — 自动拉取各设备收件箱并入库，按 `mm_sms_index` 去重
 - **定时任务** — 支持 Cron 表达式（循环）和指定时间（单次）两种模式，支持群发多个号码
 
@@ -29,7 +31,8 @@
 - **通知类型** — 设备上线/离线、短信发送失败、定时任务失败、新用户注册、用户咨询、客服回复
 
 ### 管理功能
-- **任务监控** — 管理员专属页面，查看所有用户的定时任务、执行统计、历史记录
+- **任务监控** — 管理员专属页面，查看所有用户的定时任务、执行统计（运行中/已暂停/已完成/失败）、历史记录
+- **短信记录** — 支持点击内容展开全文弹窗、一键复制（HTTP 环境兼容）
 - **用户咨询** — 用户与客服/管理员实时聊天，支持文字、图片、文件附件
 - **多语言** — 中文 / 英文切换
 - **主题** — 浅色 / 深色 / 跟随系统
@@ -42,7 +45,7 @@
 - Python 3.10+
 - Node.js 18+
 - ModemManager 1.18+
-- USB 4G 模块（SIM7600、EC25 等主流模组）
+- USB 4G 模块（SIM7600、EC25 等主流模组）或 ZTE 随身 WiFi（CDC Ethernet 模式）
 
 ---
 
@@ -79,9 +82,13 @@ cd backend
 .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-首次启动会自动创建所有数据表，并初始化：
-- 默认管理员账号：`admin` / `admin123`（请登录后立即修改密码）
-- 5 个系统预置角色
+首次启动会自动创建所有数据表。**初始数据（管理员账号 + 系统角色）需手动导入**：
+
+```bash
+sqlite3 data/sim_manager.db < docs/schema.sql
+```
+
+默认管理员账号：`admin` / `admin123`（请登录后立即修改密码）
 
 **前端**（新终端）
 
@@ -135,6 +142,15 @@ simnexus-frontend（nginx）
 ```
 
 backend 容器通过挂载宿主机 D-Bus socket（`/run/dbus/system_bus_socket`）与宿主机的 ModemManager 通信，**不在容器内启动 ModemManager**。
+
+**ZTE 随身 WiFi**：插入后宿主机会出现 CDC Ethernet 网卡（如 `enx344b50000000`），需手动配置 IP：
+
+```bash
+ip link set enx344b50000000 up
+ip addr add 192.168.0.100/24 dev enx344b50000000
+```
+
+后端容器通过路由可直接访问 `192.168.0.1`（ZTE 设备网关），无需 `network_mode: host`。
 
 **数据持久化**
 
@@ -212,11 +228,12 @@ SimNexus/
 │   │   │   └── user.py            # 用户模型 + user_roles 中间表
 │   │   ├── schemas/               # Pydantic 请求/响应结构
 │   │   ├── services/
-│   │   │   ├── modem_manager.py   # mmcli 封装
-│   │   │   ├── modem_poller.py    # 后台轮询设备状态
+│   │   │   ├── modem_manager.py   # mmcli 封装（标准 AT 命令设备）
+│   │   │   ├── modem_poller.py    # 后台轮询设备状态（mmcli + ZTE）
 │   │   │   ├── notify.py          # 通知推送工具函数
-│   │   │   └── sms_scheduler.py   # APScheduler 定时任务引擎
-│   │   └── main.py                # 应用入口，初始化默认角色和管理员
+│   │   │   ├── sms_scheduler.py   # APScheduler 定时任务引擎
+│   │   │   └── zte_http_modem.py  # ZTE 随身 WiFi goform HTTP 驱动
+│   │   └── main.py                # 应用入口，create_all 建表
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
@@ -246,9 +263,10 @@ SimNexus/
 │   │   │   ├── ScheduledTasks.tsx # 定时任务（用户视图）
 │   │   │   ├── SimCards.tsx       # SIM 卡列表
 │   │   │   ├── SimDetail.tsx      # 单卡详情
-│   │   │   ├── SmsHistory.tsx     # 短信记录
-│   │   │   ├── SmsSend.tsx        # 手动发送
+│   │   │   ├── SmsHistory.tsx     # 短信记录（支持展开全文/复制）
+│   │   │   ├── SmsSend.tsx        # 手动发送（支持模板选择）
 │   │   │   ├── SupportAdmin.tsx   # 管理员/客服咨询管理
+│   │   │   ├── Templates.tsx      # 短信模板管理
 │   │   │   └── Users.tsx          # 用户管理
 │   │   └── store/
 │   │       ├── authStore.ts       # 认证状态（token、用户、权限计算）
@@ -275,6 +293,7 @@ SimNexus/
 | `/send` | 发送短信 | `can_send_sms` |
 | `/history` | 短信记录 | `can_view_history` |
 | `/tasks` | 定时任务 | `can_manage_tasks` |
+| `/templates` | 短信模板 | `can_send_sms` |
 | `/users` | 用户管理 | 管理员 |
 | `/roles` | 角色管理 | 管理员 |
 | `/support` | 用户咨询管理 | 管理员 / `can_support` |
@@ -338,6 +357,9 @@ SimNexus/
 | GET | `/api/sms/admin/tasks` | 获取所有用户的任务（管理员） |
 | GET | `/api/sms/admin/tasks/stats` | 任务统计（管理员） |
 | GET | `/api/sms/admin/tasks/{id}/history` | 任务执行历史（管理员） |
+| GET | `/api/sms/templates` | 获取模板列表 |
+| POST | `/api/sms/templates` | 创建模板 |
+| DELETE | `/api/sms/templates/{id}` | 删除模板 |
 
 ### 通知
 
@@ -479,7 +501,7 @@ mmcli -m 0 --messaging-create-sms="number=+8613800138000,text=test"
 | 数据库 | SQLite + SQLAlchemy 2.0 |
 | 认证 | JWT（python-jose）+ bcrypt |
 | 任务调度 | APScheduler |
-| 调制解调器控制 | ModemManager（`mmcli`） |
+| 调制解调器控制 | ModemManager（`mmcli`）+ ZTE goform HTTP API |
 | 前端框架 | React 18 + TypeScript |
 | 构建工具 | Vite |
 | 样式 | Tailwind CSS |

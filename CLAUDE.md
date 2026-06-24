@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SimNexus is a multi-USB 4G modem management system. It manages multiple SIM cards, handles real-time modem status monitoring via WebSocket, and provides SMS sending (manual and scheduled), RBAC-based user/role management, a notification system, and a support chat feature. The system runs on Debian/Ubuntu and communicates with modems through the Linux `ModemManager` daemon via the `mmcli` CLI tool.
+SimNexus is a multi-USB 4G modem management system. It manages multiple SIM cards, handles real-time modem status monitoring via WebSocket, and provides SMS sending (manual and scheduled), SMS templates with variable substitution, RBAC-based user/role management, a notification system, and a support chat feature. The system runs on Debian/Ubuntu and communicates with modems through the Linux `ModemManager` daemon via the `mmcli` CLI tool. It also supports ZTE portable WiFi devices via their HTTP goform API (`services/zte_http_modem.py`).
 
 ## Commands
 
@@ -61,13 +61,15 @@ The backend is a single FastAPI app with four concurrently running components:
    - `support.py` — support chat messages, file upload, conversation list (staff only)
    - `ws.py` — WebSocket push of modem state
 
-2. **Modem Poller** (`app/services/modem_poller.py`) — An `asyncio` background task (started in `lifespan`) that calls `modem_manager.list_modems()` every `MODEM_POLL_INTERVAL` seconds. It upserts modem state into the DB keyed on `mm_object_path` (the D-Bus object path) and ingests any new inbound SMS, deduplicating by `mm_sms_index`.
+2. **Modem Poller** (`app/services/modem_poller.py`) — An `asyncio` background task (started in `lifespan`) that calls `modem_manager.list_modems()` every `MODEM_POLL_INTERVAL` seconds, then also calls `zte_http_modem.get_modem_info()` to poll any ZTE device at `192.168.0.1`. It upserts modem state into the DB keyed on `mm_object_path` and ingests any new inbound SMS, deduplicating by `mm_sms_index`. ZTE modems use synthetic path `zte:192.168.0.1`.
 
-3. **SMS Scheduler** (`app/services/sms_scheduler.py`) — An `APScheduler AsyncIOScheduler` that runs scheduled SMS tasks. It reloads active tasks from the DB every 60 seconds and registers them as APScheduler jobs with either a `CronTrigger` or `DateTrigger`. One-time tasks auto-transition to `COMPLETED` after firing.
+3. **SMS Scheduler** (`app/services/sms_scheduler.py`) — An `APScheduler AsyncIOScheduler` that runs scheduled SMS tasks. It reloads active tasks from the DB every 60 seconds and registers them as APScheduler jobs with either a `CronTrigger` or `DateTrigger`. One-time tasks transition to `COMPLETED` (partial failure) or `FAILED` (all recipients failed) after firing. `reload_tasks` skips single-shot tasks whose `send_once_at` has already passed to prevent double-execution.
 
 4. **Notification service** (`app/services/notify.py`) — helper functions that push `Notification` rows to DB. Called by the poller, scheduler, and support router. Each notification has an `audience` field; `_visible_filter()` in `notifications.py` applies per-user filtering at query time.
 
-**ModemManager integration** (`app/services/modem_manager.py`) — All modem communication is done by shelling out to `mmcli` (the ModemManager CLI). JSON output (`-J` flag) is parsed directly. SMS send is a two-step mmcli call: create SMS object → send it → delete it. The modem is identified by its numeric index extracted from the D-Bus path (e.g. `/org/freedesktop/ModemManager1/Modem/0` → index `0`).
+**ModemManager integration** (`app/services/modem_manager.py`) — All standard modem communication is done by shelling out to `mmcli` (the ModemManager CLI). JSON output (`-J` flag) is parsed directly. SMS send is a two-step mmcli call: create SMS object → send it → delete it. The modem is identified by its numeric index extracted from the D-Bus path (e.g. `/org/freedesktop/ModemManager1/Modem/0` → index `0`).
+
+**ZTE HTTP driver** (`app/services/zte_http_modem.py`) — Manages ZTE portable WiFi devices via their `goform` HTTP API at `http://192.168.0.1`. Device discovery uses three strategies: USB VID matching (`19d2`), existing `192.168.0.x` IP on a non-loopback interface, or ZTE MAC OUI (`34:4b:50`). When running inside Docker (where the host's network interface is not visible), the driver connects directly to `192.168.0.1` via the container's routing table. SMS routing in `sms.py` and `sms_scheduler.py` checks if `mm_object_path.startswith("zte:")` and calls this driver instead of mmcli. IMSI-to-operator inference is used when the device has no network service (`_MCC_MNC_MAP`). `send_once_at` is stored in UTC — the frontend converts local time via `.toISOString()` before submitting.
 
 **Database** — SQLite by default (`sim_manager.db` in the working directory). Tables are created on startup via `Base.metadata.create_all`. There is no Alembic migration workflow in active use; `backend/migrate.py` is a one-off script for a specific past schema change.
 
@@ -163,6 +165,7 @@ Support chat messages push `audience="support"` to notify staff, and `audience="
 | SimCards | `/sim-cards` | RequireAuth + `can_view_sim` |
 | SimDetail | `/modems/:id` | RequireAuth + `can_view_sim` |
 | SmsSend | `/send` | RequireAuth + `can_send_sms` |
+| Templates | `/templates` | RequireAuth + `can_send_sms` |
 | SmsHistory | `/history` | RequireAuth + `can_view_history` |
 | ScheduledTasks | `/tasks` | RequireAuth + `can_manage_tasks` |
 | Users | `/users` | RequireAdmin |
@@ -195,3 +198,7 @@ File uploads stored at `/opt/simnexus/uploads/` (UUID-named, served without auth
 - Do **not** use `passlib` for password hashing — it fails on Python 3.13. Use `bcrypt` directly.
 - `rbac_roles` is loaded with `lazy="joined"` on `User`; always available after `get_current_user`. Access via `getattr(user, "rbac_roles", None)` in security helpers that may receive users loaded without the relationship.
 - System roles (`is_system=True`) cannot be deleted via the API.
+- ZTE device `mm_object_path` is `zte:192.168.0.1` (synthetic, not a D-Bus path). All code that extracts the mmcli index via regex `/Modem/(\d+)$` must first check `if obj_path.startswith("zte:")` and route to the ZTE driver.
+- `send_once_at` is stored in UTC. The frontend must convert local datetime-local input to ISO UTC string via `new Date(val).toISOString()` before submitting. APScheduler's `DateTrigger` interprets naive datetimes as UTC.
+- SMS templates store variable names as a JSON list in `sms_templates.variables`. The frontend auto-detects `{var}` placeholders from content using a regex and presents a fill-in dialog before sending.
+- `navigator.clipboard` requires HTTPS; the frontend uses `document.execCommand('copy')` as fallback for HTTP deployments.
