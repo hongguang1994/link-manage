@@ -181,6 +181,19 @@ def _signalbar_to_quality(bar: str) -> int:
         return 0
 
 
+_MCC_MNC_MAP = {
+    "46000": "中国移动", "46002": "中国移动", "46004": "中国移动", "46007": "中国移动",
+    "46001": "中国联通", "46006": "中国联通", "46009": "中国联通",
+    "46003": "中国电信", "46005": "中国电信", "46008": "中国电信", "46011": "中国电信",
+}
+
+def _imsi_to_operator(imsi: str) -> str:
+    """从 IMSI 推断运营商名称（6位 MCC+MNC）"""
+    if not imsi or len(imsi) < 6:
+        return ""
+    return _MCC_MNC_MAP.get(imsi[:5]) or _MCC_MNC_MAP.get(imsi[:6]) or ""
+
+
 def _network_type_to_tech(nt: str) -> str:
     mapping = {
         "LTE": "lte", "4G": "lte",
@@ -226,7 +239,8 @@ def get_modem_info() -> Optional[dict]:
     operator = (
         status.get("spn_name_data") or
         status.get("plmn_name") or
-        status.get("network_provider") or ""
+        status.get("network_provider") or
+        _imsi_to_operator(status.get("sim_imsi") or info.get("sim_imsi") or "")
     )
 
     return {
