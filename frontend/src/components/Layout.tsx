@@ -22,7 +22,7 @@ export default function Layout() {
       <aside className="w-56 bg-gray-850 border-r border-gray-700 flex flex-col py-6 px-3 shrink-0" style={{ background: '#111827' }}>
         <div className="flex items-center gap-2 px-3 mb-8">
           <Cpu className="w-6 h-6 text-blue-400" />
-          <span className="font-bold text-white text-lg">SIM 管理</span>
+          <span className="font-bold text-white text-lg">SimNexus</span>
         </div>
 
         <nav className="space-y-1 flex-1">

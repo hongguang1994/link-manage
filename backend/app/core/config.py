@@ -3,7 +3,7 @@ from typing import List
 
 
 class Settings(BaseSettings):
-    APP_NAME: str = "SIM Manager"
+    APP_NAME: str = "SimNexus"
     DEBUG: bool = False
     DATABASE_URL: str = "sqlite:///./sim_manager.db"
     SECRET_KEY: str = "change-me-in-production"

@@ -20,7 +20,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">SIM 卡管理平台</h1>
+        <h1 className="text-2xl font-bold text-white">SimNexus</h1>
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <span className="w-2 h-2 rounded-full bg-green-400 inline-block" />
           在线 {connected} / {total}
