@@ -352,34 +352,19 @@ export default function Users() {
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">{t('users_perms_modules')}</p>
                   <div className="bg-gray-900/50 rounded-lg px-3">
                     <Toggle checked={perm.can_view_sim} onChange={v => setPerm(p => ({ ...p, can_view_sim: v }))} label={t('users_perm_view_sim')} />
-                    <Toggle checked={perm.can_send_sms} onChange={v => setPerm(p => ({ ...p, can_send_sms: v }))} label={t('users_perm_send_sms')} />
                     <Toggle checked={perm.can_view_history} onChange={v => setPerm(p => ({ ...p, can_view_history: v }))} label={t('users_perm_history')} />
-                    <Toggle checked={perm.can_manage_tasks} onChange={v => setPerm(p => ({ ...p, can_manage_tasks: v }))} label={t('users_perm_tasks')} />
                   </div>
                 </div>
 
-                <div>
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">{t('users_perms_devices')}</p>
-                  <div className="bg-gray-900/50 rounded-lg px-3">
-                    <Toggle checked={allModems} onChange={v => { setAllModems(v); if (v) setPerm(p => ({ ...p, allowed_modem_ids: null })) }} label={t('users_all_modems')} />
-                  </div>
-                  {!allModems && (
-                    <div className="mt-2 bg-gray-900/50 rounded-lg p-3 space-y-1.5 max-h-40 overflow-y-auto">
-                      {modems.length === 0 ? (
-                        <p className="text-xs text-gray-500">{lang === 'zh' ? '暂无已注册设备' : 'No registered devices'}</p>
-                      ) : modems.map(m => {
-                        const selected = (perm.allowed_modem_ids ?? []).includes(m.id)
-                        return (
-                          <label key={m.id} className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={selected} onChange={() => toggleModem(m.id)}
-                              className="w-3.5 h-3.5 accent-blue-500" />
-                            <span className="text-sm text-gray-300">{m.alias || `SIM ${m.id}`}</span>
-                            <span className="text-xs text-gray-500">{m.phone_number || m.operator || ''}</span>
-                          </label>
-                        )
-                      })}
-                    </div>
-                  )}
+                <div className="bg-blue-900/20 border border-blue-500/20 rounded-lg px-4 py-3">
+                  <p className="text-xs text-blue-300 font-medium mb-1">
+                    {lang === 'zh' ? 'SIM卡使用权限' : 'SIM Card Access'}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {lang === 'zh'
+                      ? '发短信、定时任务等使用权限须由用户在「SIM卡」页面申请，管理员在「SIM申请审批」页面审批后自动生效。'
+                      : 'SMS sending and task management access must be applied by users and approved via SIM Requests.'}
+                  </p>
                 </div>
 
                 {err && <p className="text-red-400 text-xs">{err}</p>}

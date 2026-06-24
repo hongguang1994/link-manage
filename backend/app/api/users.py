@@ -98,11 +98,10 @@ def update_permissions(user_id: int, data: PermissionUpdate, db: Session = Depen
         raise HTTPException(status_code=404, detail="用户不存在")
     perm = _ensure_permission(user, db)
     perm.can_view_sim = data.can_view_sim
-    perm.can_send_sms = data.can_send_sms
-    perm.can_manage_tasks = data.can_manage_tasks
     perm.can_view_history = data.can_view_history
     perm.read_only = data.read_only
-    perm.allowed_modem_ids = data.allowed_modem_ids
+    # can_send_sms / can_manage_tasks / allowed_modem_ids are managed exclusively
+    # by the SIM access request/approval flow — not settable here
     db.commit()
     db.refresh(perm)
     return perm
