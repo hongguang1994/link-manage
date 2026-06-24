@@ -1,8 +1,9 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from app.models.user import UserRole
 from app.schemas.permission import PermissionOut
+from app.schemas.role import RoleOut
 
 
 class UserCreate(BaseModel):
@@ -33,6 +34,7 @@ class UserOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     permission: Optional[PermissionOut] = None
+    rbac_roles: List[RoleOut] = []
 
     model_config = {"from_attributes": True}
 

@@ -12,8 +12,11 @@ from app.core.database import SessionLocal
 from app.models.modem import Modem, ModemStatus
 from app.models.sms import SmsMessage, SmsDirection, SmsStatus
 from app.services import modem_manager
+from app.services.notify import push
 
 logger = logging.getLogger(__name__)
+# Track previous modem statuses to detect transitions
+_prev_status: dict[str, str] = {}
 _running = False
 
 
@@ -63,14 +66,30 @@ async def _poll():
             modem.is_active = True
             db.commit()
 
+            # Detect status transitions
+            new_status = info.get("status", "unknown")
+            old_status = _prev_status.get(path)
+            label = modem.alias or modem.model or path
+            if old_status is not None and old_status != new_status:
+                if new_status == "connected":
+                    push("modem_online", f"设备上线", f"{label} 已连接")
+                elif new_status in ("disconnected", "unknown"):
+                    push("modem_offline", f"设备离线", f"{label} 已断开连接")
+            _prev_status[path] = new_status
+
             # Ingest received SMS
             await _ingest_inbox(db, modem, info["mm_index"])
 
         # Mark modems no longer detected as disconnected
-        db.query(Modem).filter(
+        gone = db.query(Modem).filter(
             Modem.mm_object_path.notin_(seen_paths),
             Modem.is_active == True
-        ).update({"status": ModemStatus.DISCONNECTED, "is_active": False}, synchronize_session=False)
+        ).all()
+        for m in gone:
+            label = m.alias or m.model or m.mm_object_path
+            push("modem_offline", "设备离线", f"{label} 已断开连接")
+            m.status = ModemStatus.DISCONNECTED
+            m.is_active = False
         db.commit()
     finally:
         db.close()

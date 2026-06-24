@@ -72,5 +72,15 @@ class ScheduledTaskOut(BaseModel):
     next_run_at: Optional[datetime]
     run_count: int
     created_at: datetime
+    created_by_id: Optional[int] = None
+    created_by_username: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class TaskStatsOut(BaseModel):
+    total: int
+    active: int
+    paused: int
+    completed: int
+    failed: int

@@ -5,16 +5,18 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_send_sms, require_manage_tasks, require_view_history, require_write
+from app.core.security import get_current_user, require_admin, require_send_sms, require_manage_tasks, require_view_history, require_write
+from app.models.user import User
 from app.models.modem import Modem
 from app.models.sms import SmsMessage, SmsTemplate, SmsScheduledTask, SmsDirection, SmsStatus, TaskStatus
 from app.schemas.sms import (
     SmsSendRequest, SmsMessageOut,
     SmsTemplateCreate, SmsTemplateOut,
-    ScheduledTaskCreate, ScheduledTaskUpdate, ScheduledTaskOut,
+    ScheduledTaskCreate, ScheduledTaskUpdate, ScheduledTaskOut, TaskStatsOut,
 )
 from app.services import modem_manager
 from app.services.sms_scheduler import scheduler, _schedule_task
+from app.services.notify import push
 
 router = APIRouter(prefix="/sms", tags=["sms"], dependencies=[Depends(get_current_user)])
 
@@ -22,7 +24,7 @@ router = APIRouter(prefix="/sms", tags=["sms"], dependencies=[Depends(get_curren
 # ── Direct send ────────────────────────────────────────────────────────────────
 
 @router.post("/send", response_model=SmsMessageOut, dependencies=[Depends(require_send_sms)])
-def send_sms(req: SmsSendRequest, db: Session = Depends(get_db)):
+def send_sms(req: SmsSendRequest, db: Session = Depends(get_db), me: User = Depends(get_current_user)):
     modem = db.query(Modem).filter(Modem.id == req.modem_id).first()
     if not modem:
         raise HTTPException(status_code=404, detail="Modem not found")
@@ -41,11 +43,19 @@ def send_sms(req: SmsSendRequest, db: Session = Depends(get_db)):
         status=SmsStatus.SENT if success else SmsStatus.FAILED,
         error_message=None if success else message,
         sent_at=datetime.utcnow() if success else None,
+        created_by_id=me.id,
     )
     db.add(sms)
     db.commit()
     db.refresh(sms)
     if not success:
+        body = f"发往 {req.phone_number} 的短信发送失败：{message}"
+        modem_label = modem.alias or modem.model or f"设备#{modem.id}"
+        if me.role.value == "admin":
+            push("sms_failed", "短信发送失败", f"[{modem_label}] {body}", audience="admin")
+        else:
+            push("sms_failed", "短信发送失败", f"[{modem_label}] {body}",
+                 audience="user", target_user_id=me.id)
         raise HTTPException(status_code=502, detail=f"SMS send failed: {message}")
     return sms
 
@@ -96,16 +106,71 @@ def delete_template(template_id: int, db: Session = Depends(get_db)):
 
 # ── Scheduled tasks ────────────────────────────────────────────────────────────
 
+def _task_to_out(task: SmsScheduledTask, db: Session) -> ScheduledTaskOut:
+    """Attach creator username to task output."""
+    data = ScheduledTaskOut.model_validate(task)
+    if task.created_by_id:
+        u = db.get(User, task.created_by_id)
+        data.created_by_username = u.username if u else None
+    return data
+
+
 @router.get("/tasks", response_model=List[ScheduledTaskOut], dependencies=[Depends(require_manage_tasks)])
-def list_tasks(db: Session = Depends(get_db)):
-    return db.query(SmsScheduledTask).order_by(SmsScheduledTask.id.desc()).all()
+def list_tasks(db: Session = Depends(get_db), me: User = Depends(get_current_user)):
+    from app.models.user import UserRole
+    q = db.query(SmsScheduledTask)
+    if me.role != UserRole.ADMIN:
+        q = q.filter(SmsScheduledTask.created_by_id == me.id)
+    tasks = q.order_by(SmsScheduledTask.id.desc()).all()
+    return [_task_to_out(t, db) for t in tasks]
+
+
+# ── Admin task monitoring ──────────────────────────────────────────────────────
+
+@router.get("/admin/tasks", response_model=List[ScheduledTaskOut], dependencies=[Depends(require_admin)])
+def admin_list_tasks(
+    status: Optional[str] = None,
+    user_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+):
+    from app.models.user import UserRole
+    q = db.query(SmsScheduledTask)
+    if status:
+        q = q.filter(SmsScheduledTask.status == status)
+    if user_id:
+        q = q.filter(SmsScheduledTask.created_by_id == user_id)
+    tasks = q.order_by(SmsScheduledTask.id.desc()).all()
+    return [_task_to_out(t, db) for t in tasks]
+
+
+@router.get("/admin/tasks/stats", response_model=TaskStatsOut, dependencies=[Depends(require_admin)])
+def admin_task_stats(db: Session = Depends(get_db)):
+    all_tasks = db.query(SmsScheduledTask).all()
+    return TaskStatsOut(
+        total=len(all_tasks),
+        active=sum(1 for t in all_tasks if t.status == TaskStatus.ACTIVE),
+        paused=sum(1 for t in all_tasks if t.status == TaskStatus.PAUSED),
+        completed=sum(1 for t in all_tasks if t.status == TaskStatus.COMPLETED),
+        failed=sum(1 for t in all_tasks if t.status == TaskStatus.FAILED),
+    )
+
+
+@router.get("/admin/tasks/{task_id}/history", response_model=List[SmsMessageOut], dependencies=[Depends(require_admin)])
+def admin_task_history(task_id: int, limit: int = 20, db: Session = Depends(get_db)):
+    return (
+        db.query(SmsMessage)
+        .filter(SmsMessage.scheduled_task_id == task_id)
+        .order_by(SmsMessage.created_at.desc())
+        .limit(limit)
+        .all()
+    )
 
 
 @router.post("/tasks", response_model=ScheduledTaskOut, dependencies=[Depends(require_manage_tasks), Depends(require_write)])
-def create_task(data: ScheduledTaskCreate, db: Session = Depends(get_db)):
+def create_task(data: ScheduledTaskCreate, db: Session = Depends(get_db), me: User = Depends(get_current_user)):
     if not data.cron_expression and not data.send_once_at:
         raise HTTPException(status_code=400, detail="Provide cron_expression or send_once_at")
-    task = SmsScheduledTask(**data.model_dump())
+    task = SmsScheduledTask(**data.model_dump(), created_by_id=me.id)
     db.add(task)
     db.commit()
     db.refresh(task)

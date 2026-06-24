@@ -34,6 +34,16 @@ export interface ScheduledTask {
   next_run_at: string | null
   run_count: number
   created_at: string
+  created_by_id: number | null
+  created_by_username: string | null
+}
+
+export interface TaskStats {
+  total: number
+  active: number
+  paused: number
+  completed: number
+  failed: number
 }
 
 export const sendSmsApi = (data: { modem_id: number; phone_number: string; content: string }) =>
@@ -52,3 +62,10 @@ export const createTaskApi = (data: Partial<ScheduledTask>) => api.post<Schedule
 export const updateTaskApi = (id: number, data: Partial<ScheduledTask>) => api.patch<ScheduledTask>(`/sms/tasks/${id}`, data)
 export const deleteTaskApi = (id: number) => api.delete(`/sms/tasks/${id}`)
 export const runTaskNowApi = (id: number) => api.post(`/sms/tasks/${id}/run-now`)
+
+// Admin-only
+export const adminGetTasksApi = (params?: { status?: string; user_id?: number }) =>
+  api.get<ScheduledTask[]>('/sms/admin/tasks', { params })
+export const adminGetTaskStatsApi = () => api.get<TaskStats>('/sms/admin/tasks/stats')
+export const adminGetTaskHistoryApi = (taskId: number) =>
+  api.get<SmsMessage[]>(`/sms/admin/tasks/${taskId}/history`)

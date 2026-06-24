@@ -9,6 +9,22 @@ export interface PermissionOut {
   allowed_modem_ids: number[] | null
 }
 
+export interface RoleOut {
+  id: number
+  name: string
+  description: string
+  is_system: boolean
+  can_view_sim: boolean
+  can_send_sms: boolean
+  can_manage_tasks: boolean
+  can_view_history: boolean
+  read_only: boolean
+  can_support: boolean
+  allowed_modem_ids: number[] | null
+  created_at: string
+  updated_at: string
+}
+
 export interface UserOut {
   id: number
   username: string
@@ -17,6 +33,7 @@ export interface UserOut {
   created_at: string
   updated_at: string
   permission?: PermissionOut | null
+  rbac_roles?: RoleOut[]
 }
 
 export interface TokenResponse {
@@ -25,8 +42,15 @@ export interface TokenResponse {
   user: UserOut
 }
 
-export const loginApi = (username: string, password: string) =>
-  api.post<TokenResponse>('/auth/login', { username, password })
+export const getCaptchaApi = () =>
+  api.get<{ token: string; svg: string }>('/auth/captcha')
+
+export const loginApi = (
+  username: string,
+  password: string,
+  captcha_token?: string,
+  captcha_code?: string,
+) => api.post<TokenResponse>('/auth/login', { username, password, captcha_token, captcha_code })
 
 export const getMeApi = () => api.get<UserOut>('/auth/me')
 

@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.permission import UserPermission
 from app.schemas.user import UserCreate, UserUpdate, UserOut, PasswordChange, AdminPasswordReset
 from app.schemas.permission import PermissionOut, PermissionUpdate
+from app.services.notify import push
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -39,6 +40,7 @@ def create_user(data: UserCreate, db: Session = Depends(get_db)):
     db.add(UserPermission(user_id=user.id))
     db.commit()
     db.refresh(user)
+    push("new_user", "新用户注册", f"新用户 {user.username} 已创建（角色：{user.role.value}）")
     return user
 
 

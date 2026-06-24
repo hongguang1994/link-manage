@@ -1,5 +1,6 @@
 import { Signal, Wifi, WifiOff, AlertCircle, HelpCircle } from 'lucide-react'
 import clsx from 'clsx'
+import { useT } from '../i18n'
 
 interface Props {
   modem: {
@@ -39,6 +40,7 @@ const SignalBars = ({ quality }: { quality: number }) => {
 }
 
 export default function ModemCard({ modem, onClick }: Props) {
+  const t = useT()
   return (
     <div
       onClick={onClick}
@@ -55,15 +57,15 @@ export default function ModemCard({ modem, onClick }: Props) {
       </div>
       <div className="space-y-1.5">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">运营商</span>
-          <span className="text-gray-200">{modem.operator || '—'}</span>
+          <span className="text-gray-400">{t('card_operator')}</span>
+          <span className="text-gray-200">{modem.operator || t('none')}</span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-gray-400">号码</span>
-          <span className="text-gray-200">{modem.phone_number || '未知'}</span>
+          <span className="text-gray-400">{t('card_phone')}</span>
+          <span className="text-gray-200">{modem.phone_number || t('card_phone_unknown')}</span>
         </div>
         <div className="flex justify-between text-sm items-center">
-          <span className="text-gray-400">信号</span>
+          <span className="text-gray-400">{t('card_signal')}</span>
           <SignalBars quality={modem.signal_quality} />
         </div>
       </div>

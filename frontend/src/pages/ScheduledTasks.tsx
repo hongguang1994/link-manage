@@ -5,6 +5,7 @@ import {
   getTasksApi, createTaskApi, deleteTaskApi, updateTaskApi, runTaskNowApi, ScheduledTask
 } from '../api/sms'
 import { useModemStore } from '../store/modemStore'
+import { useT } from '../i18n'
 import clsx from 'clsx'
 
 const statusBadge: Record<string, string> = {
@@ -16,6 +17,7 @@ const statusBadge: Record<string, string> = {
 
 function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const modems = useModemStore(s => s.modems)
+  const t = useT()
   const [form, setForm] = useState({
     name: '', modem_id: '', recipients: '', content: '', cron_expression: '', send_once_at: ''
   })
@@ -25,7 +27,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const submit = async () => {
     if (!form.name || !form.modem_id || !form.recipients || !form.content) {
-      setError('请填写所有必填项')
+      setError(t('modal_required'))
       return
     }
     setSaving(true)
@@ -41,7 +43,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       onCreated()
       onClose()
     } catch (e: any) {
-      setError(e.response?.data?.detail || '创建失败')
+      setError(e.response?.data?.detail || t('modal_create_fail'))
     } finally {
       setSaving(false)
     }
@@ -50,12 +52,12 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-lg space-y-4">
-        <h2 className="text-xl font-bold text-white">新建定时任务</h2>
+        <h2 className="text-xl font-bold text-white">{t('modal_create_title')}</h2>
 
         <input
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          placeholder="任务名称"
+          placeholder={t('modal_name_ph')}
           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
         />
 
@@ -64,14 +66,14 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           onChange={e => setForm(f => ({ ...f, modem_id: e.target.value }))}
           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
         >
-          <option value="">— 选择 SIM 卡 —</option>
+          <option value="">{t('modal_sim_ph')}</option>
           {modems.map(m => <option key={m.id} value={m.id}>{m.alias || `SIM ${m.id}`}</option>)}
         </select>
 
         <textarea
           value={form.recipients}
           onChange={e => setForm(f => ({ ...f, recipients: e.target.value }))}
-          placeholder={`接收号码（每行一个）\n+8613800138000\n+8613912345678`}
+          placeholder={t('modal_recipients_ph')}
           rows={3}
           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm resize-none"
         />
@@ -79,7 +81,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <textarea
           value={form.content}
           onChange={e => setForm(f => ({ ...f, content: e.target.value }))}
-          placeholder="短信内容"
+          placeholder={t('modal_content_ph')}
           rows={3}
           className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white resize-none"
         />
@@ -91,7 +93,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
               onClick={() => setMode(m)}
               className={clsx('px-3 py-1.5 rounded-lg text-sm', mode === m ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400')}
             >
-              {m === 'cron' ? '定时循环' : '单次发送'}
+              {m === 'cron' ? t('modal_cron') : t('modal_once')}
             </button>
           ))}
         </div>
@@ -100,7 +102,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
           <input
             value={form.cron_expression}
             onChange={e => setForm(f => ({ ...f, cron_expression: e.target.value }))}
-            placeholder="Cron 表达式，如 0 9 * * * (每天9点)"
+            placeholder={t('modal_cron_ph')}
             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
           />
         ) : (
@@ -115,13 +117,13 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white">{t('cancel')}</button>
           <button
             onClick={submit}
             disabled={saving}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg"
           >
-            {saving ? '创建中…' : '创建任务'}
+            {saving ? t('modal_creating') : t('modal_create_btn')}
           </button>
         </div>
       </div>
@@ -132,6 +134,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 export default function ScheduledTasks() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const t = useT()
 
   const load = () => getTasksApi().then(r => setTasks(r.data))
   useEffect(() => { load() }, [])
@@ -143,7 +146,7 @@ export default function ScheduledTasks() {
   }
 
   const remove = async (id: number) => {
-    if (!confirm('确认删除此任务？')) return
+    if (!confirm(t('tasks_confirm_delete'))) return
     await deleteTaskApi(id)
     load()
   }
@@ -156,18 +159,18 @@ export default function ScheduledTasks() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">定时任务</h1>
+        <h1 className="text-2xl font-bold text-white">{t('tasks_title')}</h1>
         <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm"
         >
-          <Plus className="w-4 h-4" /> 新建任务
+          <Plus className="w-4 h-4" /> {t('tasks_create')}
         </button>
       </div>
 
       {tasks.length === 0 ? (
         <div className="bg-gray-800 border border-dashed border-gray-600 rounded-xl p-10 text-center text-gray-500">
-          暂无定时任务
+          {t('tasks_empty')}
         </div>
       ) : (
         <div className="space-y-3">
@@ -183,20 +186,20 @@ export default function ScheduledTasks() {
                   </div>
                   <p className="text-sm text-gray-400 mt-1">{task.content}</p>
                   <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                    <span>收件人 {task.recipients.length} 个</span>
-                    <span>{task.cron_expression ? `CRON: ${task.cron_expression}` : `单次: ${task.send_once_at ? format(new Date(task.send_once_at), 'MM-dd HH:mm') : ''}`}</span>
-                    <span>已执行 {task.run_count} 次</span>
-                    {task.last_run_at && <span>最近: {format(new Date(task.last_run_at), 'MM-dd HH:mm')}</span>}
+                    <span>{t('tasks_recipients')} {task.recipients.length}{t('tasks_recipients_unit')}</span>
+                    <span>{task.cron_expression ? `CRON: ${task.cron_expression}` : `${t('modal_once')}: ${task.send_once_at ? format(new Date(task.send_once_at), 'MM-dd HH:mm') : ''}`}</span>
+                    <span>{t('tasks_runs')} {task.run_count}{t('tasks_runs_unit')}</span>
+                    {task.last_run_at && <span>{t('tasks_last_run')}: {format(new Date(task.last_run_at), 'MM-dd HH:mm')}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => runNow(task.id)} title="立即执行" className="text-gray-400 hover:text-green-400">
+                  <button onClick={() => runNow(task.id)} title={t('tasks_run_now')} className="text-gray-400 hover:text-green-400">
                     <Play className="w-4 h-4" />
                   </button>
-                  <button onClick={() => toggleStatus(task)} title={task.status === 'active' ? '暂停' : '启用'} className="text-gray-400 hover:text-yellow-400">
+                  <button onClick={() => toggleStatus(task)} title={task.status === 'active' ? t('tasks_pause') : t('tasks_resume')} className="text-gray-400 hover:text-yellow-400">
                     <PauseCircle className="w-4 h-4" />
                   </button>
-                  <button onClick={() => remove(task.id)} title="删除" className="text-gray-400 hover:text-red-400">
+                  <button onClick={() => remove(task.id)} title={t('tasks_delete')} className="text-gray-400 hover:text-red-400">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

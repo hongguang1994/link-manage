@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
 import { getMessagesApi, SmsMessage } from '../api/sms'
 import { useModemStore } from '../store/modemStore'
+import { useT } from '../i18n'
 import clsx from 'clsx'
 
 const statusColors: Record<string, string> = {
@@ -14,6 +15,7 @@ const statusColors: Record<string, string> = {
 
 export default function SmsHistory() {
   const modems = useModemStore(s => s.modems)
+  const t = useT()
   const [messages, setMessages] = useState<SmsMessage[]>([])
   const [filterModem, setFilterModem] = useState<number | ''>('')
   const [filterDir, setFilterDir] = useState<string>('')
@@ -34,7 +36,7 @@ export default function SmsHistory() {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold text-white">短信记录</h1>
+      <h1 className="text-2xl font-bold text-white">{t('hist_title')}</h1>
 
       <div className="flex gap-3">
         <select
@@ -42,7 +44,7 @@ export default function SmsHistory() {
           onChange={e => setFilterModem(e.target.value ? Number(e.target.value) : '')}
           className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
         >
-          <option value="">全部设备</option>
+          <option value="">{t('hist_all_devices')}</option>
           {modems.map(m => <option key={m.id} value={m.id}>{m.alias || `SIM ${m.id}`}</option>)}
         </select>
         <select
@@ -50,27 +52,27 @@ export default function SmsHistory() {
           onChange={e => setFilterDir(e.target.value)}
           className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
         >
-          <option value="">全部方向</option>
-          <option value="inbound">收件</option>
-          <option value="outbound">发件</option>
+          <option value="">{t('hist_all_dir')}</option>
+          <option value="inbound">{t('hist_inbound')}</option>
+          <option value="outbound">{t('hist_outbound')}</option>
         </select>
-        <button onClick={load} className="ml-auto text-sm text-blue-400 hover:text-blue-300">刷新</button>
+        <button onClick={load} className="ml-auto text-sm text-blue-400 hover:text-blue-300">{t('refresh')}</button>
       </div>
 
       <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">加载中…</div>
+          <div className="p-8 text-center text-gray-500">{t('loading')}</div>
         ) : messages.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">暂无记录</div>
+          <div className="p-8 text-center text-gray-500">{t('hist_empty')}</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b border-gray-700 text-gray-400">
               <tr>
-                <th className="px-4 py-3 text-left">方向</th>
-                <th className="px-4 py-3 text-left">号码</th>
-                <th className="px-4 py-3 text-left">内容</th>
-                <th className="px-4 py-3 text-left">状态</th>
-                <th className="px-4 py-3 text-left">时间</th>
+                <th className="px-4 py-3 text-left">{t('hist_col_dir')}</th>
+                <th className="px-4 py-3 text-left">{t('hist_col_phone')}</th>
+                <th className="px-4 py-3 text-left">{t('hist_col_content')}</th>
+                <th className="px-4 py-3 text-left">{t('hist_col_status')}</th>
+                <th className="px-4 py-3 text-left">{t('hist_col_time')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">

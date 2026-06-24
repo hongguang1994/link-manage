@@ -7,6 +7,9 @@ import ScheduledTasks from './pages/ScheduledTasks'
 import SimDetail from './pages/SimDetail'
 import SimCards from './pages/SimCards'
 import Users from './pages/Users'
+import Roles from './pages/Roles'
+import SupportAdmin from './pages/SupportAdmin'
+import AdminTasks from './pages/AdminTasks'
 import Login from './pages/Login'
 import { useAuthStore } from './store/authStore'
 
@@ -19,6 +22,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
   if (user?.role !== 'admin') return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function RequireSupport({ children }: { children: React.ReactNode }) {
+  const canSupport = useAuthStore(s => s.canSupport)
+  if (!canSupport()) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -35,6 +44,9 @@ export default function App() {
           <Route path="/history" element={<SmsHistory />} />
           <Route path="/tasks" element={<ScheduledTasks />} />
           <Route path="/users" element={<RequireAdmin><Users /></RequireAdmin>} />
+          <Route path="/roles" element={<RequireAdmin><Roles /></RequireAdmin>} />
+          <Route path="/support" element={<RequireSupport><SupportAdmin /></RequireSupport>} />
+          <Route path="/admin/tasks" element={<RequireAdmin><AdminTasks /></RequireAdmin>} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -12,7 +12,9 @@ from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.sms import SmsScheduledTask, SmsMessage, TaskStatus, SmsStatus, SmsDirection
 from app.models.modem import Modem
+from app.models.user import UserRole
 from app.services import modem_manager
+from app.services.notify import push
 
 logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler()
@@ -91,6 +93,7 @@ async def execute_task(task_id: int):
         mm_index = match.group(1)
 
         recipients = task.recipients if isinstance(task.recipients, list) else []
+        fail_count = 0
         for phone_number in recipients:
             success, message = modem_manager.send_sms(mm_index, phone_number, task.content)
             sms = SmsMessage(
@@ -102,8 +105,26 @@ async def execute_task(task_id: int):
                 error_message=None if success else message,
                 sent_at=datetime.utcnow() if success else None,
                 scheduled_task_id=task.id,
+                created_by_id=task.created_by_id,
             )
             db.add(sms)
+            if not success:
+                fail_count += 1
+
+        if fail_count:
+            modem_label = modem.alias or modem.model or f"设备#{modem.id}"
+            body = f"任务「{task.name}」[{modem_label}] 有 {fail_count}/{len(recipients)} 条短信发送失败"
+            creator = db.get(task.__class__.__mapper__.class_, task.id)  # refresh
+            if task.created_by_id:
+                from app.models.user import User
+                creator_user = db.get(User, task.created_by_id)
+                if creator_user and creator_user.role == UserRole.ADMIN:
+                    push("task_failed", "定时任务失败", body, audience="admin")
+                else:
+                    push("task_failed", "定时任务失败", body,
+                         audience="user", target_user_id=task.created_by_id)
+            else:
+                push("task_failed", "定时任务失败", body, audience="admin")
 
         task.last_run_at = datetime.utcnow()
         task.run_count = (task.run_count or 0) + 1

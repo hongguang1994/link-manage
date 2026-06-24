@@ -58,7 +58,10 @@ def require_admin(current_user=Depends(get_current_user)):
 
 
 def _perm(user):
-    """Return permission object or a full-access default for admins."""
+    """Return effective permission object.
+    Priority: admin > merged RBAC roles > legacy UserPermission > full-access default.
+    Role merging: any True wins for flags; read_only=False if any role allows writes;
+    allowed_modem_ids=None (all) if any role has no restriction, else union of IDs."""
     from app.models.user import UserRole
     from app.models.permission import UserPermission
     if user.role == UserRole.ADMIN:
@@ -66,6 +69,23 @@ def _perm(user):
             can_view_sim=True, can_send_sms=True,
             can_manage_tasks=True, can_view_history=True,
             read_only=False, allowed_modem_ids=None,
+        )
+    roles = getattr(user, "rbac_roles", None)
+    if roles:
+        view_sim = any(r.can_view_sim for r in roles)
+        send_sms = any(r.can_send_sms for r in roles)
+        manage  = any(r.can_manage_tasks for r in roles)
+        history = any(r.can_view_history for r in roles)
+        ro      = all(r.read_only for r in roles)   # read_only only if ALL roles are read_only
+        # Device scope: None means unrestricted; union IDs otherwise
+        if any(r.allowed_modem_ids is None for r in roles):
+            modem_ids = None
+        else:
+            modem_ids = list({mid for r in roles for mid in (r.allowed_modem_ids or [])}) or None
+        return UserPermission(
+            can_view_sim=view_sim, can_send_sms=send_sms,
+            can_manage_tasks=manage, can_view_history=history,
+            read_only=ro, allowed_modem_ids=modem_ids,
         )
     return user.permission
 
@@ -90,6 +110,23 @@ def require_view_history(current_user=Depends(get_current_user)):
     p = _perm(current_user)
     if not p or not p.can_view_history:
         raise HTTPException(status_code=403, detail="无短信记录查看权限")
+    return current_user
+
+
+def is_support_staff(user) -> bool:
+    """True for admin users or users with any RBAC role that has can_support=True."""
+    from app.models.user import UserRole
+    if user.role == UserRole.ADMIN:
+        return True
+    roles = getattr(user, "rbac_roles", None)
+    if roles and any(r.can_support for r in roles):
+        return True
+    return False
+
+
+def require_support_staff(current_user=Depends(get_current_user)):
+    if not is_support_staff(current_user):
+        raise HTTPException(status_code=403, detail="无客服权限")
     return current_user
 
 

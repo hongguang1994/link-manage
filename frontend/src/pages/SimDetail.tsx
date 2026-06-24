@@ -6,14 +6,13 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { getModemDetailApi, updateModemApi, refreshModemApi, type ModemDetail } from '../api/modems'
-
-// ── helpers ───────────────────────────────────────────────────────────────────
+import { useT } from '../i18n'
+import { useLangStore } from '../store/langStore'
 
 function fmtBytes(bytes: number | null | undefined): string {
   if (!bytes) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let v = bytes
-  let u = 0
+  let v = bytes, u = 0
   while (v >= 1024 && u < units.length - 1) { v /= 1024; u++ }
   return `${v.toFixed(u === 0 ? 0 : 1)} ${units[u]}`
 }
@@ -24,15 +23,10 @@ function fmtDuration(seconds: number | null | undefined): string {
   const h = Math.floor((seconds % 86400) / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
-  if (d > 0) return `${d}天 ${h}小时`
-  if (h > 0) return `${h}小时 ${m}分钟`
-  if (m > 0) return `${m}分钟 ${s}秒`
-  return `${s}秒`
-}
-
-function fmtTime(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('zh-CN')
+  if (d > 0) return `${d}d ${h}h`
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
 }
 
 function techLabel(techs: string | null | undefined): string {
@@ -44,23 +38,12 @@ function techLabel(techs: string | null | undefined): string {
   return techs.split(',').map(t => map[t.trim().toLowerCase()] ?? t.trim().toUpperCase()).join(' / ')
 }
 
-function regLabel(state: string | null | undefined): string {
-  if (!state) return '—'
-  const map: Record<string, string> = {
-    home: '已注册（归属网络）', roaming: '已注册（漫游）',
-    searching: '搜索网络中', denied: '注册被拒', idle: '空闲',
-  }
-  return map[state.toLowerCase()] ?? state
-}
-
-// ── sub-components ────────────────────────────────────────────────────────────
-
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status, t }: { status: string; t: ReturnType<typeof useT> }) => {
   const cfg = {
-    connected: { icon: Wifi, cls: 'bg-green-500/20 text-green-400 border-green-500/30', label: '在线' },
-    disconnected: { icon: WifiOff, cls: 'bg-gray-500/20 text-gray-400 border-gray-500/30', label: '离线' },
-    error: { icon: AlertCircle, cls: 'bg-red-500/20 text-red-400 border-red-500/30', label: '错误' },
-    unknown: { icon: HelpCircle, cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', label: '未知' },
+    connected:    { icon: Wifi,        cls: 'bg-green-500/20 text-green-400 border-green-500/30',    label: t('status_connected') },
+    disconnected: { icon: WifiOff,     cls: 'bg-gray-500/20 text-gray-400 border-gray-500/30',       label: t('status_disconnected') },
+    error:        { icon: AlertCircle, cls: 'bg-red-500/20 text-red-400 border-red-500/30',          label: t('status_error') },
+    unknown:      { icon: HelpCircle,  cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', label: t('status_unknown') },
   }[status] ?? { icon: HelpCircle, cls: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', label: status }
   const Icon = cfg.icon
   return (
@@ -101,16 +84,30 @@ const StatCard = ({ icon: Icon, label, value, color = 'text-blue-400' }: StatCar
   </div>
 )
 
-// ── main page ─────────────────────────────────────────────────────────────────
-
 export default function SimDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const t = useT()
+  const lang = useLangStore(s => s.lang)
   const [modem, setModem] = useState<ModemDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [editingAlias, setEditingAlias] = useState(false)
   const [alias, setAlias] = useState('')
+
+  const fmtTime = (iso: string | null | undefined) => {
+    if (!iso) return t('none')
+    return new Date(iso).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')
+  }
+
+  const regLabel = (state: string | null | undefined): string => {
+    if (!state) return t('none')
+    const map: Record<string, string> = {
+      home: t('detail_reg_home'), roaming: t('detail_reg_roaming'),
+      searching: t('detail_reg_searching'), denied: t('detail_reg_denied'), idle: t('detail_reg_idle'),
+    }
+    return map[state.toLowerCase()] ?? state
+  }
 
   const load = () => {
     if (!id) return
@@ -125,12 +122,8 @@ export default function SimDetail() {
   const handleRefresh = async () => {
     if (!id) return
     setRefreshing(true)
-    try {
-      await refreshModemApi(Number(id))
-      await load()
-    } finally {
-      setRefreshing(false)
-    }
+    try { await refreshModemApi(Number(id)); await load() }
+    finally { setRefreshing(false) }
   }
 
   const saveAlias = async () => {
@@ -142,19 +135,16 @@ export default function SimDetail() {
 
   if (loading) return (
     <div className="p-6 flex items-center gap-2 text-gray-400">
-      <RefreshCw className="w-4 h-4 animate-spin" /> 加载中…
+      <RefreshCw className="w-4 h-4 animate-spin" /> {t('loading')}
     </div>
   )
 
-  if (!modem) return (
-    <div className="p-6 text-red-400">未找到该 SIM 卡</div>
-  )
+  if (!modem) return <div className="p-6 text-red-400">{t('detail_not_found')}</div>
 
   const displayName = modem.alias || `SIM ${modem.id}`
 
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <button onClick={() => navigate(-1)}
           className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors">
@@ -168,6 +158,7 @@ export default function SimDetail() {
                 value={alias}
                 onChange={e => setAlias(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveAlias()}
+                placeholder={t('detail_alias_ph')}
                 autoFocus
               />
               <button onClick={saveAlias} className="p-1.5 rounded text-green-400 hover:bg-gray-800"><Check className="w-4 h-4" /></button>
@@ -182,60 +173,56 @@ export default function SimDetail() {
               </button>
             </div>
           )}
-          <p className="text-sm text-gray-500 mt-0.5">{modem.device_path || modem.mm_object_path || '—'}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{modem.device_path || modem.mm_object_path || t('none')}</p>
         </div>
         <div className="flex items-center gap-3">
-          <StatusBadge status={modem.status} />
+          <StatusBadge status={modem.status} t={t} />
           <button
             onClick={handleRefresh}
             disabled={refreshing}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors disabled:opacity-50"
           >
             <RefreshCw className={clsx('w-4 h-4', refreshing && 'animate-spin')} />
-            刷新
+            {refreshing ? t('detail_refreshing') : t('detail_refresh')}
           </button>
         </div>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard icon={Signal} label="信号强度" value={`${modem.signal_quality}%`} color="text-green-400" />
-        <StatCard icon={Clock} label="在线时长" value={fmtDuration(modem.connection_duration)} color="text-blue-400" />
-        <StatCard icon={Upload} label="上行流量" value={fmtBytes(modem.tx_bytes)} color="text-orange-400" />
-        <StatCard icon={Download} label="下行流量" value={fmtBytes(modem.rx_bytes)} color="text-purple-400" />
+        <StatCard icon={Signal} label={t('detail_signal')} value={`${modem.signal_quality}%`} color="text-green-400" />
+        <StatCard icon={Clock} label={t('detail_duration')} value={fmtDuration(modem.connection_duration)} color="text-blue-400" />
+        <StatCard icon={Upload} label={t('detail_upload')} value={fmtBytes(modem.tx_bytes)} color="text-orange-400" />
+        <StatCard icon={Download} label={t('detail_download')} value={fmtBytes(modem.rx_bytes)} color="text-purple-400" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* SIM / 设备信息 */}
         <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">SIM 卡信息</h2>
-          <InfoRow label="手机号码" value={modem.phone_number || '未知'} />
-          <InfoRow label="IMEI" value={<span className="font-mono text-xs">{modem.imei || '—'}</span>} />
-          <InfoRow label="运营商" value={modem.operator || '—'} />
-          <InfoRow label="注册状态" value={regLabel(modem.registration_state)} />
-          <InfoRow label="网络制式" value={techLabel(modem.access_technologies)} />
-          <InfoRow label="信号强度" value={<SignalBars quality={modem.signal_quality} />} />
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_sim_info')}</h2>
+          <InfoRow label={t('detail_phone')} value={modem.phone_number || t('unknown')} />
+          <InfoRow label={t('detail_imei')} value={<span className="font-mono text-xs">{modem.imei || t('none')}</span>} />
+          <InfoRow label={t('detail_operator')} value={modem.operator || t('none')} />
+          <InfoRow label={t('detail_reg')} value={regLabel(modem.registration_state)} />
+          <InfoRow label={t('detail_tech')} value={techLabel(modem.access_technologies)} />
+          <InfoRow label={t('detail_signal')} value={<SignalBars quality={modem.signal_quality} />} />
         </section>
 
-        {/* 设备硬件 */}
         <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">设备信息</h2>
-          <InfoRow label="制造商" value={modem.manufacturer || '—'} />
-          <InfoRow label="型号" value={modem.model || '—'} />
-          <InfoRow label="设备路径" value={<span className="font-mono text-xs">{modem.device_path || '—'}</span>} />
-          <InfoRow label="D-Bus 路径" value={<span className="font-mono text-xs truncate block max-w-full">{modem.mm_object_path || '—'}</span>} />
-          <InfoRow label="首次接入" value={fmtTime(modem.created_at)} />
-          <InfoRow label="最后在线" value={fmtTime(modem.last_seen)} />
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_hardware')}</h2>
+          <InfoRow label="Manufacturer" value={modem.manufacturer || t('none')} />
+          <InfoRow label="Model" value={modem.model || t('none')} />
+          <InfoRow label={t('detail_device')} value={<span className="font-mono text-xs">{modem.device_path || t('none')}</span>} />
+          <InfoRow label="D-Bus" value={<span className="font-mono text-xs truncate block max-w-full">{modem.mm_object_path || t('none')}</span>} />
+          <InfoRow label={t('detail_conn_since')} value={fmtTime(modem.created_at)} />
+          <InfoRow label={t('detail_last_seen')} value={fmtTime(modem.last_seen)} />
         </section>
 
-        {/* 短信统计 */}
         <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">短信统计</h2>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_sms_stats')}</h2>
           <div className="grid grid-cols-3 gap-4 mt-2">
             {[
-              { label: '已发送', value: modem.sms_sent, color: 'text-blue-400', icon: Upload },
-              { label: '已接收', value: modem.sms_received, color: 'text-green-400', icon: Download },
-              { label: '今日', value: modem.sms_today, color: 'text-orange-400', icon: MessageSquare },
+              { label: t('detail_sms_sent'), value: modem.sms_sent, color: 'text-blue-400', icon: Upload },
+              { label: t('detail_sms_recv'), value: modem.sms_received, color: 'text-green-400', icon: Download },
+              { label: t('detail_sms_today'), value: modem.sms_today, color: 'text-orange-400', icon: MessageSquare },
             ].map(s => (
               <div key={s.label} className="text-center">
                 <p className={clsx('text-3xl font-bold', s.color)}>{s.value}</p>
@@ -245,13 +232,12 @@ export default function SimDetail() {
           </div>
         </section>
 
-        {/* 流量详情 */}
         <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">流量统计</h2>
-          <InfoRow label="上行（发送）" value={fmtBytes(modem.tx_bytes)} />
-          <InfoRow label="下行（接收）" value={fmtBytes(modem.rx_bytes)} />
-          <InfoRow label="总计" value={fmtBytes((modem.tx_bytes ?? 0) + (modem.rx_bytes ?? 0))} />
-          <InfoRow label="连接时长" value={fmtDuration(modem.connection_duration)} />
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_traffic')}</h2>
+          <InfoRow label={t('detail_tx')} value={fmtBytes(modem.tx_bytes)} />
+          <InfoRow label={t('detail_rx')} value={fmtBytes(modem.rx_bytes)} />
+          <InfoRow label="Total" value={fmtBytes((modem.tx_bytes ?? 0) + (modem.rx_bytes ?? 0))} />
+          <InfoRow label={t('detail_duration')} value={fmtDuration(modem.connection_duration)} />
         </section>
       </div>
     </div>
