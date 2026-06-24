@@ -235,7 +235,7 @@ VALUES (
     1,
     'admin',
     '$2b$12$J.PGYM99.G2T1/1wseKWI.HTcy.JskTr.4O5/ihgYUHnSU.NUefai',
-    'admin',
+    'ADMIN',
     1,
     datetime('now'),
     datetime('now')
