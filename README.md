@@ -408,6 +408,15 @@ mmcli -m 0 --messaging-create-sms="number=+8613800138000,text=test"
 | 实时通信 | WebSocket |
 | 容器化 | Docker + Docker Compose |
 
+## 文档
+
+| 文件 | 说明 |
+|------|------|
+| [docs/database-schema.md](docs/database-schema.md) | 数据库表结构与关系详细说明 |
+| [docs/schema.sql](docs/schema.sql) | 建表 SQL（可直接在空库执行） |
+| [docs/schema-er.svg](docs/schema-er.svg) | 数据表 ER 关系图 |
+| [docs/network-model.svg](docs/network-model.svg) | Docker 网络拓扑图 |
+
 ## License
 
 MIT
