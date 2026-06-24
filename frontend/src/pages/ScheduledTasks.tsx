@@ -38,7 +38,9 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         recipients: form.recipients.split('\n').map(s => s.trim()).filter(Boolean),
         content: form.content,
         cron_expression: mode === 'cron' ? form.cron_expression : undefined,
-        send_once_at: mode === 'once' ? form.send_once_at : undefined,
+        send_once_at: mode === 'once' && form.send_once_at
+          ? new Date(form.send_once_at).toISOString()
+          : undefined,
       } as any)
       onCreated()
       onClose()
