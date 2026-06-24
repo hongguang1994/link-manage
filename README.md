@@ -24,8 +24,8 @@
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
-cd link-manage
+git clone https://github.com/hongguang1994/SimNexus.git
+cd SimNexus
 ```
 
 ### 2. 初始化系统环境
@@ -78,7 +78,7 @@ docker compose up -d
 ## 项目结构
 
 ```
-link-manage/
+SimNexus/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
