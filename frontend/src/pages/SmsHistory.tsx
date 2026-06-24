@@ -15,7 +15,7 @@ function CopyableContent({ text }: { text: string }) {
     })
   }, [text])
   return (
-    <div className="flex items-center gap-2 group max-w-xs">
+    <div className="relative flex items-center gap-2 group max-w-xs">
       <span className="truncate text-gray-300" title={text}>{text}</span>
       <button
         onClick={copy}
@@ -23,6 +23,11 @@ function CopyableContent({ text }: { text: string }) {
       >
         {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
       </button>
+      {copied && (
+        <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-600 text-green-400 text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none">
+          已复制
+        </span>
+      )}
     </div>
   )
 }
