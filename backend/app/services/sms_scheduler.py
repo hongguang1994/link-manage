@@ -142,7 +142,7 @@ async def execute_task(task_id: int):
         task.last_run_at = datetime.utcnow()
         task.run_count = (task.run_count or 0) + 1
         if task.send_once_at:
-            task.status = TaskStatus.COMPLETED
+            task.status = TaskStatus.FAILED if fail_count == len(recipients) else TaskStatus.COMPLETED
         db.commit()
         logger.info(f"Task {task_id} executed, sent to {len(recipients)} recipients")
     except Exception as e:
