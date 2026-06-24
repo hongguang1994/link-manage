@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Send, Clock, MessageSquare, Cpu, CreditCard,
   Users, LogOut, Sun, Moon, Monitor, ChevronDown, User, KeyRound, X, ShieldCheck,
   Wifi, RefreshCw, ArrowUp, MessageCircle, PanelLeftClose, PanelLeftOpen,
-  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield,
+  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useModemStore } from '../store/modemStore'
@@ -535,6 +535,12 @@ export default function Layout() {
               <NavLink to="/send" className={navLinkCls} title={sideCollapsed ? t('nav_send') : undefined}>
                 <Send className="w-4 h-4 shrink-0" />
                 {!sideCollapsed && <span>{t('nav_send')}</span>}
+              </NavLink>
+            )}
+            {p.can_send_sms && (
+              <NavLink to="/templates" className={navLinkCls} title={sideCollapsed ? '短信模板' : undefined}>
+                <FileText className="w-4 h-4 shrink-0" />
+                {!sideCollapsed && <span>{lang === 'zh' ? '短信模板' : 'Templates'}</span>}
               </NavLink>
             )}
             {p.can_view_history && (

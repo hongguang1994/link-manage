@@ -10,6 +10,7 @@ import Users from './pages/Users'
 import Roles from './pages/Roles'
 import SupportAdmin from './pages/SupportAdmin'
 import AdminTasks from './pages/AdminTasks'
+import Templates from './pages/Templates'
 import Login from './pages/Login'
 import { useAuthStore } from './store/authStore'
 
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/roles" element={<RequireAdmin><Roles /></RequireAdmin>} />
           <Route path="/support" element={<RequireSupport><SupportAdmin /></RequireSupport>} />
           <Route path="/admin/tasks" element={<RequireAdmin><AdminTasks /></RequireAdmin>} />
+          <Route path="/templates" element={<Templates />} />
         </Route>
       </Routes>
     </BrowserRouter>

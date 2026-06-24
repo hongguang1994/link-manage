@@ -1,8 +1,120 @@
-import { useState } from 'react'
-import { Send, CheckCircle, XCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Send, CheckCircle, XCircle, FileText, X } from 'lucide-react'
 import { useModemStore } from '../store/modemStore'
-import { sendSmsApi } from '../api/sms'
+import { sendSmsApi, getTemplatesApi, SmsTemplate } from '../api/sms'
 import { useT } from '../i18n'
+
+function extractVars(content: string): string[] {
+  const matches = content.match(/\{(\w+)\}/g) || []
+  return [...new Set(matches.map(m => m.slice(1, -1)))]
+}
+
+function applyVars(content: string, vals: Record<string, string>): string {
+  return content.replace(/\{(\w+)\}/g, (_, k) => vals[k] ?? `{${k}}`)
+}
+
+function TemplatePicker({
+  templates,
+  onSelect,
+  onClose,
+}: {
+  templates: SmsTemplate[]
+  onSelect: (tpl: SmsTemplate) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 w-full max-w-lg space-y-3 max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white">选择模板</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+        {templates.length === 0 ? (
+          <p className="text-gray-400 text-sm py-4 text-center">暂无模板</p>
+        ) : (
+          <div className="overflow-y-auto space-y-2">
+            {templates.map(tpl => (
+              <button
+                key={tpl.id}
+                onClick={() => onSelect(tpl)}
+                className="w-full text-left bg-gray-700 hover:bg-gray-600 rounded-lg p-3 transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-medium text-white text-sm">{tpl.name}</span>
+                  {tpl.variables && tpl.variables.length > 0 && (
+                    <span className="text-xs text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded">
+                      {tpl.variables.length} 个变量
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 truncate">{tpl.content}</p>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function VarFillModal({
+  template,
+  onConfirm,
+  onClose,
+}: {
+  template: SmsTemplate
+  onConfirm: (content: string) => void
+  onClose: () => void
+}) {
+  const vars = template.variables && template.variables.length > 0
+    ? template.variables
+    : extractVars(template.content)
+  const [vals, setVals] = useState<Record<string, string>>(
+    Object.fromEntries(vars.map(v => [v, '']))
+  )
+
+  const preview = applyVars(template.content, vals)
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 w-full max-w-lg space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-white">填写变量</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="space-y-3">
+          {vars.map(v => (
+            <div key={v}>
+              <label className="block text-sm text-gray-400 mb-1">{'{' + v + '}'}</label>
+              <input
+                value={vals[v] || ''}
+                onChange={e => setVals(prev => ({ ...prev, [v]: e.target.value }))}
+                placeholder={`请输入 ${v}`}
+                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-gray-900 rounded-lg p-3">
+          <p className="text-xs text-gray-500 mb-1">预览</p>
+          <p className="text-sm text-gray-200 whitespace-pre-wrap break-all">{preview}</p>
+        </div>
+
+        <div className="flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">取消</button>
+          <button
+            onClick={() => onConfirm(preview)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm"
+          >
+            使用此内容
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function SmsSend() {
   const modems = useModemStore(s => s.modems)
@@ -12,6 +124,13 @@ export default function SmsSend() {
   const [content, setContent] = useState('')
   const [status, setStatus] = useState<'idle' | 'sending' | 'ok' | 'err'>('idle')
   const [errMsg, setErrMsg] = useState('')
+  const [templates, setTemplates] = useState<SmsTemplate[]>([])
+  const [showPicker, setShowPicker] = useState(false)
+  const [pendingTpl, setPendingTpl] = useState<SmsTemplate | null>(null)
+
+  useEffect(() => {
+    getTemplatesApi().then(r => setTemplates(r.data)).catch(() => {})
+  }, [])
 
   const send = async () => {
     if (!modemId || !phone || !content) return
@@ -25,6 +144,18 @@ export default function SmsSend() {
     } catch (e: any) {
       setErrMsg(e.response?.data?.detail || t('sms_fail_default'))
       setStatus('err')
+    }
+  }
+
+  const onPickTemplate = (tpl: SmsTemplate) => {
+    setShowPicker(false)
+    const vars = tpl.variables && tpl.variables.length > 0
+      ? tpl.variables
+      : extractVars(tpl.content)
+    if (vars.length > 0) {
+      setPendingTpl(tpl)
+    } else {
+      setContent(tpl.content)
     }
   }
 
@@ -60,7 +191,15 @@ export default function SmsSend() {
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">{t('sms_content')}</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm text-gray-400">{t('sms_content')}</label>
+            <button
+              onClick={() => setShowPicker(true)}
+              className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" /> 从模板选择
+            </button>
+          </div>
           <textarea
             value={content}
             onChange={e => setContent(e.target.value)}
@@ -92,6 +231,21 @@ export default function SmsSend() {
           </div>
         )}
       </div>
+
+      {showPicker && (
+        <TemplatePicker
+          templates={templates}
+          onSelect={onPickTemplate}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
+      {pendingTpl && (
+        <VarFillModal
+          template={pendingTpl}
+          onConfirm={text => { setContent(text); setPendingTpl(null) }}
+          onClose={() => setPendingTpl(null)}
+        />
+      )}
     </div>
   )
 }
