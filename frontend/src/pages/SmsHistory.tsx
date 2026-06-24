@@ -6,13 +6,26 @@ import { useModemStore } from '../store/modemStore'
 import { useT } from '../i18n'
 import clsx from 'clsx'
 
+function fallbackCopy(text: string, done: () => void) {
+  const el = document.createElement('textarea')
+  el.value = text
+  el.style.cssText = 'position:fixed;top:-999px;left:-999px'
+  document.body.appendChild(el)
+  el.focus()
+  el.select()
+  try { document.execCommand('copy'); done() } catch {}
+  document.body.removeChild(el)
+}
+
 function CopyableContent({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   const copy = useCallback(() => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
+    const done = () => { setCopied(true); setTimeout(() => setCopied(false), 1500) }
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done))
+    } else {
+      fallbackCopy(text, done)
+    }
   }, [text])
   return (
     <div className="relative flex items-center gap-2 group max-w-xs">
