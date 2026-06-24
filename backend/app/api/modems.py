@@ -5,12 +5,13 @@ from typing import List
 from datetime import datetime, date
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.modem import Modem
 from app.models.sms import SmsMessage, SmsDirection
 from app.schemas.modem import ModemOut, ModemUpdate, ModemDetail
 from app.services import modem_manager
 
-router = APIRouter(prefix="/modems", tags=["modems"])
+router = APIRouter(prefix="/modems", tags=["modems"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=List[ModemOut])

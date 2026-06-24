@@ -5,9 +5,11 @@ import asyncio
 import json
 import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
+from jose import JWTError, jwt
 from app.core.database import SessionLocal
+from app.core.security import SECRET_KEY, ALGORITHM
 from app.models.modem import Modem
+from app.models.user import User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -15,7 +17,26 @@ _clients: list[WebSocket] = []
 
 
 @router.websocket("/ws/modems")
-async def modem_status_ws(websocket: WebSocket):
+async def modem_status_ws(websocket: WebSocket, token: str = ""):
+    # Validate JWT before accepting
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            await websocket.close(code=4001)
+            return
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.username == username, User.is_active == True).first()
+            if not user:
+                await websocket.close(code=4001)
+                return
+        finally:
+            db.close()
+    except JWTError:
+        await websocket.close(code=4001)
+        return
+
     await websocket.accept()
     _clients.append(websocket)
     try:

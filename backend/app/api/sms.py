@@ -5,6 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.modem import Modem
 from app.models.sms import SmsMessage, SmsTemplate, SmsScheduledTask, SmsDirection, SmsStatus, TaskStatus
 from app.schemas.sms import (
@@ -15,7 +16,7 @@ from app.schemas.sms import (
 from app.services import modem_manager
 from app.services.sms_scheduler import scheduler, _schedule_task
 
-router = APIRouter(prefix="/sms", tags=["sms"])
+router = APIRouter(prefix="/sms", tags=["sms"], dependencies=[Depends(get_current_user)])
 
 
 # ── Direct send ────────────────────────────────────────────────────────────────
