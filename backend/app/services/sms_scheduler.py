@@ -37,10 +37,14 @@ def reload_tasks():
     try:
         tasks = db.query(SmsScheduledTask).filter(SmsScheduledTask.status == TaskStatus.ACTIVE).all()
         active_ids = set()
+        now = datetime.utcnow()
         for task in tasks:
             job_id = f"sms_task_{task.id}"
             active_ids.add(job_id)
             if scheduler.get_job(job_id):
+                continue
+            # 单次任务：执行时间已过则跳过（避免重复执行）
+            if task.send_once_at and task.send_once_at <= now:
                 continue
             _schedule_task(task, db)
         # Remove jobs for deleted/paused tasks
