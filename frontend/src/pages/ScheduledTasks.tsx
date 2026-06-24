@@ -30,6 +30,14 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
       setError(t('modal_required'))
       return
     }
+    if (mode === 'cron' && !form.cron_expression) {
+      setError(t('modal_required'))
+      return
+    }
+    if (mode === 'once' && !form.send_once_at) {
+      setError(t('modal_required'))
+      return
+    }
     setSaving(true)
     try {
       await createTaskApi({

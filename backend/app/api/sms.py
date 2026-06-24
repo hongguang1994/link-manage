@@ -177,9 +177,12 @@ def admin_task_history(task_id: int, limit: int = 20, db: Session = Depends(get_
 
 @router.post("/tasks", response_model=ScheduledTaskOut, dependencies=[Depends(require_manage_tasks), Depends(require_write)])
 def create_task(data: ScheduledTaskCreate, db: Session = Depends(get_db), me: User = Depends(get_current_user)):
-    if not data.cron_expression and not data.send_once_at:
+    cron = data.cron_expression.strip() if data.cron_expression else None
+    if not cron and not data.send_once_at:
         raise HTTPException(status_code=400, detail="Provide cron_expression or send_once_at")
-    task = SmsScheduledTask(**data.model_dump(), created_by_id=me.id)
+    dump = data.model_dump()
+    dump['cron_expression'] = cron
+    task = SmsScheduledTask(**dump, created_by_id=me.id)
     db.add(task)
     db.commit()
     db.refresh(task)
