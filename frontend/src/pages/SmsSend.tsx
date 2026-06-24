@@ -41,7 +41,7 @@ export default function SmsSend() {
             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white"
           >
             <option value="">{t('sms_select_placeholder')}</option>
-            {modems.filter(m => m.status === 'connected').map(m => (
+            {modems.filter(m => m.status === 'connected' || m.status === 'disconnected').map(m => (
               <option key={m.id} value={m.id}>
                 {m.alias || `SIM ${m.id}`} — {m.operator || t('sms_operator_unknown')} {m.phone_number ? `(${m.phone_number})` : ''}
               </option>
