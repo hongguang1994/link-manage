@@ -1,54 +1,86 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, KeyRound, ShieldCheck, ShieldOff, RefreshCw, X, Check } from 'lucide-react'
+import { Plus, Trash2, KeyRound, ShieldCheck, ShieldOff, RefreshCw, X, Check, Settings2 } from 'lucide-react'
 import clsx from 'clsx'
 import {
   listUsersApi, createUserApi, updateUserApi, deleteUserApi,
-  resetPasswordApi, changePasswordApi, type UserOut,
+  resetPasswordApi, changePasswordApi, getPermissionsApi, updatePermissionsApi,
+  type UserOut, type PermissionOut,
 } from '../api/auth'
+import { getModemsApi, type Modem } from '../api/modems'
 import { useAuthStore } from '../store/authStore'
 
 type Modal =
   | { type: 'create' }
   | { type: 'reset_pwd'; user: UserOut }
   | { type: 'change_pwd' }
+  | { type: 'permissions'; user: UserOut }
   | null
 
 const RoleBadge = ({ role }: { role: string }) => (
   <span className={clsx(
     'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium',
-    role === 'admin'
-      ? 'bg-blue-500/20 text-blue-300'
-      : 'bg-gray-500/20 text-gray-400'
+    role === 'admin' ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-500/20 text-gray-400'
   )}>
     {role === 'admin' ? <ShieldCheck className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />}
     {role === 'admin' ? '管理员' : '普通用户'}
   </span>
 )
 
+const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) => (
+  <label className="flex items-center justify-between py-2 border-b border-gray-700/50 last:border-0 cursor-pointer">
+    <span className="text-sm text-gray-300">{label}</span>
+    <button type="button"
+      onClick={() => onChange(!checked)}
+      className={clsx('w-10 h-5 rounded-full transition-colors relative flex-shrink-0', checked ? 'bg-blue-600' : 'bg-gray-600')}>
+      <span className={clsx('absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all', checked ? 'left-5' : 'left-0.5')} />
+    </button>
+  </label>
+)
+
 export default function Users() {
   const { user: me } = useAuthStore()
   const [users, setUsers] = useState<UserOut[]>([])
+  const [modems, setModems] = useState<Modem[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<Modal>(null)
   const [err, setErr] = useState('')
 
-  // create form
   const [newUsername, setNewUsername] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [newRole, setNewRole] = useState<'admin' | 'user'>('user')
-
-  // reset / change pwd form
   const [pwdNew, setPwdNew] = useState('')
   const [pwdOld, setPwdOld] = useState('')
 
+  const [perm, setPerm] = useState<PermissionOut>({
+    can_view_sim: true, can_send_sms: true,
+    can_manage_tasks: true, can_view_history: true,
+    read_only: false, allowed_modem_ids: null,
+  })
+  const [allModems, setAllModems] = useState(true)
+
   const load = () => {
     setLoading(true)
-    listUsersApi().then(r => setUsers(r.data)).finally(() => setLoading(false))
+    Promise.all([
+      listUsersApi().then(r => setUsers(r.data)),
+      getModemsApi().then(r => setModems(r.data)),
+    ]).finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
 
-  const closeModal = () => { setModal(null); setErr(''); setPwdNew(''); setPwdOld(''); setNewUsername(''); setNewPassword(''); setNewRole('user') }
+  const closeModal = () => {
+    setModal(null); setErr('')
+    setPwdNew(''); setPwdOld('')
+    setNewUsername(''); setNewPassword(''); setNewRole('user')
+  }
+
+  const openPermissions = async (u: UserOut) => {
+    const res = await getPermissionsApi(u.id)
+    const p = res.data
+    setPerm(p)
+    setAllModems(p.allowed_modem_ids === null)
+    setModal({ type: 'permissions', user: u })
+  }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('')
@@ -59,37 +91,50 @@ export default function Users() {
   }
 
   const handleToggleActive = async (u: UserOut) => {
-    await updateUserApi(u.id, { is_active: !u.is_active })
-    load()
+    await updateUserApi(u.id, { is_active: !u.is_active }); load()
   }
 
   const handleToggleRole = async (u: UserOut) => {
-    await updateUserApi(u.id, { role: u.role === 'admin' ? 'user' : 'admin' })
-    load()
+    await updateUserApi(u.id, { role: u.role === 'admin' ? 'user' : 'admin' }); load()
   }
 
   const handleDelete = async (u: UserOut) => {
     if (!confirm(`确认删除用户「${u.username}」？`)) return
-    await deleteUserApi(u.id)
-    load()
+    await deleteUserApi(u.id); load()
   }
 
   const handleResetPwd = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('')
     if (modal?.type !== 'reset_pwd') return
-    try {
-      await resetPasswordApi(modal.user.id, pwdNew)
-      closeModal()
-    } catch (e: any) { setErr(e.response?.data?.detail || '重置失败') }
+    try { await resetPasswordApi(modal.user.id, pwdNew); closeModal() }
+    catch (e: any) { setErr(e.response?.data?.detail || '重置失败') }
   }
 
   const handleChangePwd = async (e: React.FormEvent) => {
     e.preventDefault(); setErr('')
+    try { await changePasswordApi(pwdOld, pwdNew); closeModal(); alert('密码已修改，请重新登录') }
+    catch (e: any) { setErr(e.response?.data?.detail || '修改失败') }
+  }
+
+  const handleSavePerm = async (e: React.FormEvent) => {
+    e.preventDefault(); setErr('')
+    if (modal?.type !== 'permissions') return
     try {
-      await changePasswordApi(pwdOld, pwdNew)
-      closeModal()
-      alert('密码已修改，请重新登录')
-    } catch (e: any) { setErr(e.response?.data?.detail || '修改失败') }
+      const payload: PermissionOut = {
+        ...perm,
+        allowed_modem_ids: allModems ? null : (perm.allowed_modem_ids ?? []),
+      }
+      await updatePermissionsApi(modal.user.id, payload)
+      load(); closeModal()
+    } catch (e: any) { setErr(e.response?.data?.detail || '保存失败') }
+  }
+
+  const toggleModem = (id: number) => {
+    const cur = perm.allowed_modem_ids ?? []
+    setPerm(p => ({
+      ...p,
+      allowed_modem_ids: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id],
+    }))
   }
 
   const inputCls = "w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
@@ -146,8 +191,14 @@ export default function Users() {
                     {new Date(u.created_at).toLocaleString('zh-CN')}
                   </td>
                   <td className="px-4 py-3">
-                    {u.id !== me?.id && (
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {u.role === 'user' && u.id !== me?.id && (
+                        <button onClick={() => openPermissions(u)} title="权限配置"
+                          className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-gray-700 rounded transition-colors">
+                          <Settings2 className="w-4 h-4" />
+                        </button>
+                      )}
+                      {u.id !== me?.id && (<>
                         <button onClick={() => handleToggleRole(u)} title={u.role === 'admin' ? '降为普通用户' : '升为管理员'}
                           className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded transition-colors">
                           <ShieldCheck className="w-4 h-4" />
@@ -164,8 +215,8 @@ export default function Users() {
                           className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
-                      </div>
-                    )}
+                      </>)}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -174,15 +225,18 @@ export default function Users() {
         </div>
       )}
 
-      {/* Modal overlay */}
       {modal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+          <div className={clsx(
+            'bg-gray-800 border border-gray-700 rounded-2xl p-6 shadow-2xl w-full',
+            modal.type === 'permissions' ? 'max-w-md' : 'max-w-sm'
+          )}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-white">
                 {modal.type === 'create' && '新建用户'}
                 {modal.type === 'reset_pwd' && `重置密码 — ${(modal as any).user.username}`}
                 {modal.type === 'change_pwd' && '修改我的密码'}
+                {modal.type === 'permissions' && `权限配置 — ${(modal as any).user.username}`}
               </h2>
               <button onClick={closeModal} className="text-gray-500 hover:text-gray-300"><X className="w-5 h-5" /></button>
             </div>
@@ -190,7 +244,7 @@ export default function Users() {
             {modal.type === 'create' && (
               <form onSubmit={handleCreate} className="space-y-4">
                 <div><label className={labelCls}>用户名</label>
-                  <input className={inputCls} value={newUsername} onChange={e => setNewUsername(e.target.value)} required autoFocus placeholder="3-20 个字符" />
+                  <input className={inputCls} value={newUsername} onChange={e => setNewUsername(e.target.value)} required autoFocus />
                 </div>
                 <div><label className={labelCls}>密码</label>
                   <input className={inputCls} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required placeholder="至少 6 位" />
@@ -226,6 +280,57 @@ export default function Users() {
                 </div>
                 {err && <p className="text-red-400 text-xs">{err}</p>}
                 <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium transition-colors">修改密码</button>
+              </form>
+            )}
+
+            {modal.type === 'permissions' && (
+              <form onSubmit={handleSavePerm} className="space-y-5">
+                {/* Operation type */}
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">操作类型</p>
+                  <div className="bg-gray-900/50 rounded-lg px-3">
+                    <Toggle checked={!perm.read_only} onChange={v => setPerm(p => ({ ...p, read_only: !v }))} label="允许写操作（发送/创建/修改/删除）" />
+                  </div>
+                </div>
+
+                {/* Feature modules */}
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">功能模块</p>
+                  <div className="bg-gray-900/50 rounded-lg px-3">
+                    <Toggle checked={perm.can_view_sim} onChange={v => setPerm(p => ({ ...p, can_view_sim: v }))} label="SIM 卡管理（查看）" />
+                    <Toggle checked={perm.can_send_sms} onChange={v => setPerm(p => ({ ...p, can_send_sms: v }))} label="发送短信" />
+                    <Toggle checked={perm.can_view_history} onChange={v => setPerm(p => ({ ...p, can_view_history: v }))} label="短信记录" />
+                    <Toggle checked={perm.can_manage_tasks} onChange={v => setPerm(p => ({ ...p, can_manage_tasks: v }))} label="定时任务" />
+                  </div>
+                </div>
+
+                {/* Device scope */}
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">设备范围</p>
+                  <div className="bg-gray-900/50 rounded-lg px-3">
+                    <Toggle checked={allModems} onChange={v => { setAllModems(v); if (v) setPerm(p => ({ ...p, allowed_modem_ids: null })) }} label="允许访问所有 SIM 卡" />
+                  </div>
+                  {!allModems && (
+                    <div className="mt-2 bg-gray-900/50 rounded-lg p-3 space-y-1.5 max-h-40 overflow-y-auto">
+                      {modems.length === 0 ? (
+                        <p className="text-xs text-gray-500">暂无已注册设备</p>
+                      ) : modems.map(m => {
+                        const selected = (perm.allowed_modem_ids ?? []).includes(m.id)
+                        return (
+                          <label key={m.id} className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={selected} onChange={() => toggleModem(m.id)}
+                              className="w-3.5 h-3.5 accent-blue-500" />
+                            <span className="text-sm text-gray-300">{m.alias || `SIM ${m.id}`}</span>
+                            <span className="text-xs text-gray-500">{m.phone_number || m.operator || ''}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {err && <p className="text-red-400 text-xs">{err}</p>}
+                <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-lg py-2 text-sm font-medium transition-colors">保存权限</button>
               </form>
             )}
           </div>

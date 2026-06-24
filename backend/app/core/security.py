@@ -55,3 +55,46 @@ def require_admin(current_user=Depends(get_current_user)):
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限")
     return current_user
+
+
+def _perm(user):
+    """Return permission object or a full-access default for admins."""
+    from app.models.user import UserRole
+    from app.models.permission import UserPermission
+    if user.role == UserRole.ADMIN:
+        return UserPermission(
+            can_view_sim=True, can_send_sms=True,
+            can_manage_tasks=True, can_view_history=True,
+            read_only=False, allowed_modem_ids=None,
+        )
+    return user.permission
+
+
+def require_send_sms(current_user=Depends(get_current_user)):
+    p = _perm(current_user)
+    if not p or not p.can_send_sms:
+        raise HTTPException(status_code=403, detail="无发送短信权限")
+    if p.read_only:
+        raise HTTPException(status_code=403, detail="当前账号为只读模式")
+    return current_user
+
+
+def require_manage_tasks(current_user=Depends(get_current_user)):
+    p = _perm(current_user)
+    if not p or not p.can_manage_tasks:
+        raise HTTPException(status_code=403, detail="无定时任务管理权限")
+    return current_user
+
+
+def require_view_history(current_user=Depends(get_current_user)):
+    p = _perm(current_user)
+    if not p or not p.can_view_history:
+        raise HTTPException(status_code=403, detail="无短信记录查看权限")
+    return current_user
+
+
+def require_write(current_user=Depends(get_current_user)):
+    p = _perm(current_user)
+    if p and p.read_only:
+        raise HTTPException(status_code=403, detail="当前账号为只读模式")
+    return current_user

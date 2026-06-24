@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import Base, engine, SessionLocal
 from app.core.security import hash_password
+from app.models import user, permission  # ensure tables are created
 from app.api import modems, sms
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router

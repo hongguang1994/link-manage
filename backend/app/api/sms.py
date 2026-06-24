@@ -5,7 +5,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_send_sms, require_manage_tasks, require_view_history, require_write
 from app.models.modem import Modem
 from app.models.sms import SmsMessage, SmsTemplate, SmsScheduledTask, SmsDirection, SmsStatus, TaskStatus
 from app.schemas.sms import (
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/sms", tags=["sms"], dependencies=[Depends(get_curren
 
 # ── Direct send ────────────────────────────────────────────────────────────────
 
-@router.post("/send", response_model=SmsMessageOut)
+@router.post("/send", response_model=SmsMessageOut, dependencies=[Depends(require_send_sms)])
 def send_sms(req: SmsSendRequest, db: Session = Depends(get_db)):
     modem = db.query(Modem).filter(Modem.id == req.modem_id).first()
     if not modem:
@@ -52,7 +52,7 @@ def send_sms(req: SmsSendRequest, db: Session = Depends(get_db)):
 
 # ── Message history ────────────────────────────────────────────────────────────
 
-@router.get("/messages", response_model=List[SmsMessageOut])
+@router.get("/messages", response_model=List[SmsMessageOut], dependencies=[Depends(require_view_history)])
 def list_messages(
     modem_id: Optional[int] = None,
     direction: Optional[SmsDirection] = None,
@@ -75,7 +75,7 @@ def list_templates(db: Session = Depends(get_db)):
     return db.query(SmsTemplate).all()
 
 
-@router.post("/templates", response_model=SmsTemplateOut)
+@router.post("/templates", response_model=SmsTemplateOut, dependencies=[Depends(require_write)])
 def create_template(data: SmsTemplateCreate, db: Session = Depends(get_db)):
     tpl = SmsTemplate(**data.model_dump())
     db.add(tpl)
@@ -84,7 +84,7 @@ def create_template(data: SmsTemplateCreate, db: Session = Depends(get_db)):
     return tpl
 
 
-@router.delete("/templates/{template_id}")
+@router.delete("/templates/{template_id}", dependencies=[Depends(require_write)])
 def delete_template(template_id: int, db: Session = Depends(get_db)):
     tpl = db.query(SmsTemplate).filter(SmsTemplate.id == template_id).first()
     if not tpl:
@@ -96,12 +96,12 @@ def delete_template(template_id: int, db: Session = Depends(get_db)):
 
 # ── Scheduled tasks ────────────────────────────────────────────────────────────
 
-@router.get("/tasks", response_model=List[ScheduledTaskOut])
+@router.get("/tasks", response_model=List[ScheduledTaskOut], dependencies=[Depends(require_manage_tasks)])
 def list_tasks(db: Session = Depends(get_db)):
     return db.query(SmsScheduledTask).order_by(SmsScheduledTask.id.desc()).all()
 
 
-@router.post("/tasks", response_model=ScheduledTaskOut)
+@router.post("/tasks", response_model=ScheduledTaskOut, dependencies=[Depends(require_manage_tasks), Depends(require_write)])
 def create_task(data: ScheduledTaskCreate, db: Session = Depends(get_db)):
     if not data.cron_expression and not data.send_once_at:
         raise HTTPException(status_code=400, detail="Provide cron_expression or send_once_at")
@@ -113,7 +113,7 @@ def create_task(data: ScheduledTaskCreate, db: Session = Depends(get_db)):
     return task
 
 
-@router.patch("/tasks/{task_id}", response_model=ScheduledTaskOut)
+@router.patch("/tasks/{task_id}", response_model=ScheduledTaskOut, dependencies=[Depends(require_manage_tasks), Depends(require_write)])
 def update_task(task_id: int, data: ScheduledTaskUpdate, db: Session = Depends(get_db)):
     task = db.query(SmsScheduledTask).filter(SmsScheduledTask.id == task_id).first()
     if not task:
@@ -130,7 +130,7 @@ def update_task(task_id: int, data: ScheduledTaskUpdate, db: Session = Depends(g
     return task
 
 
-@router.delete("/tasks/{task_id}")
+@router.delete("/tasks/{task_id}", dependencies=[Depends(require_manage_tasks), Depends(require_write)])
 def delete_task(task_id: int, db: Session = Depends(get_db)):
     task = db.query(SmsScheduledTask).filter(SmsScheduledTask.id == task_id).first()
     if not task:

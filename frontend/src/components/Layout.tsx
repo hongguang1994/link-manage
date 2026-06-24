@@ -5,19 +5,13 @@ import { useModemSocket } from '../hooks/useModemSocket'
 import { useAuthStore } from '../store/authStore'
 import clsx from 'clsx'
 
-const navItems = [
-  { to: '/', icon: LayoutDashboard, label: '总览' },
-  { to: '/sim-cards', icon: CreditCard, label: 'SIM 卡管理' },
-  { to: '/send', icon: Send, label: '发送短信' },
-  { to: '/history', icon: MessageSquare, label: '短信记录' },
-  { to: '/tasks', icon: Clock, label: '定时任务' },
-]
 
 export default function Layout() {
   useModemSocket()
   const modems = useModemStore(s => s.modems)
   const connected = modems.filter(m => m.status === 'connected').length
-  const { user, clearAuth } = useAuthStore()
+  const { user, clearAuth, perm } = useAuthStore()
+  const p = perm()
   const navigate = useNavigate()
 
   const logout = () => { clearAuth(); navigate('/login') }
@@ -31,24 +25,38 @@ export default function Layout() {
         </div>
 
         <nav className="space-y-1 flex-1">
-          {navItems.map(({ to, icon: Icon, label }) => (
-            <NavLink key={to} to={to} end={to === '/'}
-              className={({ isActive }) => clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
-              )}>
-              <Icon className="w-4 h-4" />
-              {label}
+          <NavLink to="/" end
+            className={({ isActive }) => clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors', isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800')}>
+            <LayoutDashboard className="w-4 h-4" /> 总览
+          </NavLink>
+          {p.can_view_sim && (
+            <NavLink to="/sim-cards"
+              className={({ isActive }) => clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors', isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800')}>
+              <CreditCard className="w-4 h-4" /> SIM 卡管理
             </NavLink>
-          ))}
+          )}
+          {p.can_send_sms && (
+            <NavLink to="/send"
+              className={({ isActive }) => clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors', isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800')}>
+              <Send className="w-4 h-4" /> 发送短信
+            </NavLink>
+          )}
+          {p.can_view_history && (
+            <NavLink to="/history"
+              className={({ isActive }) => clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors', isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800')}>
+              <MessageSquare className="w-4 h-4" /> 短信记录
+            </NavLink>
+          )}
+          {p.can_manage_tasks && (
+            <NavLink to="/tasks"
+              className={({ isActive }) => clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors', isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800')}>
+              <Clock className="w-4 h-4" /> 定时任务
+            </NavLink>
+          )}
           {user?.role === 'admin' && (
             <NavLink to="/users"
-              className={({ isActive }) => clsx(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors',
-                isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
-              )}>
-              <Users className="w-4 h-4" />
-              用户管理
+              className={({ isActive }) => clsx('flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors', isActive ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800')}>
+              <Users className="w-4 h-4" /> 用户管理
             </NavLink>
           )}
         </nav>

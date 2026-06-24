@@ -4,9 +4,21 @@ from typing import List
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin, hash_password, verify_password
 from app.models.user import User
+from app.models.permission import UserPermission
 from app.schemas.user import UserCreate, UserUpdate, UserOut, PasswordChange, AdminPasswordReset
+from app.schemas.permission import PermissionOut, PermissionUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+def _ensure_permission(user: User, db: Session) -> UserPermission:
+    """Return existing permission record or create a default one."""
+    if not user.permission:
+        perm = UserPermission(user_id=user.id)
+        db.add(perm)
+        db.commit()
+        db.refresh(user)
+    return user.permission
 
 
 @router.get("/", response_model=List[UserOut], dependencies=[Depends(require_admin)])
@@ -22,6 +34,9 @@ def create_user(data: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="密码至少 6 位")
     user = User(username=data.username, password_hash=hash_password(data.password), role=data.role)
     db.add(user)
+    db.flush()
+    # Create default permission record for new user
+    db.add(UserPermission(user_id=user.id))
     db.commit()
     db.refresh(user)
     return user
@@ -64,6 +79,31 @@ def reset_password(user_id: int, data: AdminPasswordReset, db: Session = Depends
     db.commit()
     db.refresh(user)
     return user
+
+
+@router.get("/{user_id}/permissions", response_model=PermissionOut, dependencies=[Depends(require_admin)])
+def get_permissions(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return _ensure_permission(user, db)
+
+
+@router.put("/{user_id}/permissions", response_model=PermissionOut, dependencies=[Depends(require_admin)])
+def update_permissions(user_id: int, data: PermissionUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    perm = _ensure_permission(user, db)
+    perm.can_view_sim = data.can_view_sim
+    perm.can_send_sms = data.can_send_sms
+    perm.can_manage_tasks = data.can_manage_tasks
+    perm.can_view_history = data.can_view_history
+    perm.read_only = data.read_only
+    perm.allowed_modem_ids = data.allowed_modem_ids
+    db.commit()
+    db.refresh(perm)
+    return perm
 
 
 @router.post("/me/change-password")
