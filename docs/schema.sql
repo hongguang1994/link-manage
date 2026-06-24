@@ -1,7 +1,11 @@
--- SimNexus 数据库表结构
+-- SimNexus 数据库表结构与初始数据
 -- 数据库：SQLite
 -- 生成时间：2026-06-24
 --
+-- 用法：在空数据库上执行此文件即可完成初始化
+--   sqlite3 sim_manager.db < docs/schema.sql
+--
+-- 初始账号：admin / admin123（登录后请立即修改密码）
 -- 建表顺序按依赖关系排列（被引用表在前）
 
 -- -----------------------------------------------------
@@ -219,3 +223,28 @@ CREATE TABLE IF NOT EXISTS support_messages (
 );
 
 CREATE INDEX IF NOT EXISTS ix_support_messages_id ON support_messages (id);
+
+-- -----------------------------------------------------
+-- 初始数据（仅在空库首次导入时执行）
+-- -----------------------------------------------------
+
+-- 默认管理员账号：admin / admin123
+-- password_hash 为 bcrypt 哈希，登录后请及时修改密码
+INSERT OR IGNORE INTO users (id, username, password_hash, role, is_active, created_at, updated_at)
+VALUES (
+    1,
+    'admin',
+    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQyCjAfozXjILsDNInWYlGFGK',
+    'admin',
+    1,
+    datetime('now'),
+    datetime('now')
+);
+
+-- 系统预置角色（is_system=1 表示不可通过 API 删除）
+INSERT OR IGNORE INTO roles (name, description, is_system, can_view_sim, can_send_sms, can_manage_tasks, can_view_history, read_only, can_support, allowed_modem_ids, created_at, updated_at) VALUES
+    ('全功能用户', '可使用所有功能，无设备限制',           1, 1, 1, 1, 1, 0, 0, NULL, datetime('now'), datetime('now')),
+    ('只读用户',   '仅可查看，不可操作',                   1, 1, 0, 0, 1, 1, 0, NULL, datetime('now'), datetime('now')),
+    ('短信操作员', '可发送短信，查看记录，不可管理任务',   1, 1, 1, 0, 1, 0, 0, NULL, datetime('now'), datetime('now')),
+    ('任务管理员', '可管理定时任务，可查看记录',           1, 1, 1, 1, 1, 0, 0, NULL, datetime('now'), datetime('now')),
+    ('客服',       '可查看并回复用户咨询，无其他管理权限', 1, 0, 0, 0, 0, 1, 1, NULL, datetime('now'), datetime('now'));

@@ -5,8 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.database import Base, engine, SessionLocal
-from app.core.security import hash_password
+from app.core.database import Base, engine
 from app.models import user, permission, support, notification  # ensure tables are created
 from app.models import role as role_model  # ensure roles table is created
 from app.api import modems, sms
@@ -23,59 +22,9 @@ from app.services.sms_scheduler import start as scheduler_start, stop as schedul
 logging.basicConfig(level=logging.INFO)
 
 
-DEFAULT_ROLES = [
-    {"name": "全功能用户", "description": "可使用所有功能，无设备限制", "is_system": True,
-     "can_view_sim": True, "can_send_sms": True, "can_manage_tasks": True, "can_view_history": True,
-     "read_only": False, "allowed_modem_ids": None},
-    {"name": "只读用户", "description": "仅可查看，不可操作", "is_system": True,
-     "can_view_sim": True, "can_send_sms": False, "can_manage_tasks": False, "can_view_history": True,
-     "read_only": True, "allowed_modem_ids": None},
-    {"name": "短信操作员", "description": "可发送短信，查看记录，不可管理任务", "is_system": True,
-     "can_view_sim": True, "can_send_sms": True, "can_manage_tasks": False, "can_view_history": True,
-     "read_only": False, "allowed_modem_ids": None},
-    {"name": "任务管理员", "description": "可管理定时任务，可查看记录", "is_system": True,
-     "can_view_sim": True, "can_send_sms": True, "can_manage_tasks": True, "can_view_history": True,
-     "read_only": False, "can_support": False, "allowed_modem_ids": None},
-    {"name": "客服", "description": "可查看并回复用户咨询，无其他管理权限", "is_system": True,
-     "can_view_sim": False, "can_send_sms": False, "can_manage_tasks": False, "can_view_history": False,
-     "read_only": True, "can_support": True, "allowed_modem_ids": None},
-]
-
-
-def _seed_default_roles():
-    from app.models.role import Role
-    db = SessionLocal()
-    try:
-        for r in DEFAULT_ROLES:
-            if not db.query(Role).filter(Role.name == r["name"]).first():
-                db.add(Role(**r))
-        db.commit()
-    finally:
-        db.close()
-
-
-def _ensure_default_admin():
-    from app.models.user import User, UserRole
-    db = SessionLocal()
-    try:
-        if db.query(User).count() == 0:
-            admin = User(
-                username="admin",
-                password_hash=hash_password("admin123"),
-                role=UserRole.ADMIN,
-            )
-            db.add(admin)
-            db.commit()
-            logging.getLogger(__name__).info("默认管理员账号已创建：admin / admin123")
-    finally:
-        db.close()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
-    _seed_default_roles()
-    _ensure_default_admin()
     scheduler_start()
     poller_task = asyncio.create_task(modem_poller.start_polling())
     yield

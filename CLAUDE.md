@@ -73,9 +73,7 @@ The backend is a single FastAPI app with four concurrently running components:
 
 **WebSocket** (`app/api/ws.py`) — `/ws/modems?token=<JWT>` pushes all modem state from DB every 5 seconds to all connected clients. State comes from DB (written by the poller), not live from mmcli.
 
-**Startup initialization** (`app/main.py` `lifespan`) — On first boot, creates:
-- Default admin user: `admin` / `admin123`
-- 5 system roles (see `DEFAULT_ROLES` in `main.py`): 全功能用户, 只读用户, 短信操作员, 任务管理员, 客服
+**Startup initialization** (`app/main.py` `lifespan`) — Only runs `Base.metadata.create_all`. Initial data (admin user + 5 system roles) is no longer seeded from code; it lives in `docs/schema.sql`. To initialize a fresh database: `sqlite3 sim_manager.db < docs/schema.sql`.
 
 ### Security layer (`app/core/security.py`)
 
