@@ -69,7 +69,15 @@ def _post(data: dict, timeout: int = 5) -> Optional[dict]:
 
 
 def _find_zte_interface() -> Optional[str]:
-    """找到连接 ZTE 设备的网络接口名（通过 USB VID 匹配）"""
+    """
+    找到连接 ZTE 设备的网络接口名。
+
+    策略（按优先级）：
+    1. 扫描 USB 设备，匹配 ZTE Vendor ID (19d2)
+    2. 若找不到（如 PVE USB 直通场景），找已有 192.168.0.x IP 的非主接口
+    3. 找 MAC 前缀为 34:4b:50（ZTE 特征）的接口并尝试连通性
+    """
+    # 策略1：USB VID 匹配
     try:
         result = subprocess.run(
             ["find", "/sys/bus/usb/devices", "-name", "idVendor"],
@@ -82,7 +90,6 @@ def _find_zte_interface() -> Optional[str]:
                 vendor = open(path).read().strip()
                 if vendor != ZTE_VENDOR_ID:
                     continue
-                # 找对应的网络接口
                 dev_path = path.replace("/idVendor", "")
                 net_result = subprocess.run(
                     ["find", dev_path, "-name", "net", "-type", "d"],
@@ -98,8 +105,39 @@ def _find_zte_interface() -> Optional[str]:
                         return ifaces[0]
             except Exception:
                 continue
-    except Exception as e:
-        logger.debug(f"ZTE interface scan failed: {e}")
+    except Exception:
+        pass
+
+    # 策略2：找已有 192.168.0.x 段 IP 的接口（排除 lo）
+    try:
+        result = subprocess.run(["ip", "-o", "addr"], capture_output=True, text=True)
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            iface = parts[1]
+            addr = parts[3].split("/")[0]
+            if iface == "lo":
+                continue
+            if addr.startswith("192.168.0."):
+                return iface
+    except Exception:
+        pass
+
+    # 策略3：MAC 前缀匹配 34:4b:50（ZTE OUI）
+    try:
+        result = subprocess.run(["ip", "link"], capture_output=True, text=True)
+        lines = result.stdout.splitlines()
+        for i, line in enumerate(lines):
+            if "link/ether" in line and "34:4b:50" in line:
+                # 前一行包含接口名
+                prev = lines[i - 1] if i > 0 else ""
+                for part in prev.split():
+                    if part.endswith(":"):
+                        return part.rstrip(":")
+    except Exception:
+        pass
+
     return None
 
 
@@ -130,13 +168,8 @@ def _ensure_interface_up(iface: str) -> bool:
 
 
 def is_available() -> bool:
-    """检测是否有可用的 ZTE 设备"""
-    iface = _find_zte_interface()
-    if not iface:
-        return False
-    if not _ensure_interface_up(iface):
-        return False
-    result = _get("modem_main_state")
+    """检测是否有可用的 ZTE 设备（直接尝试 HTTP 连接）"""
+    result = _get("modem_main_state", timeout=3)
     return result is not None and "modem_main_state" in result
 
 
@@ -171,11 +204,17 @@ def get_modem_info() -> Optional[dict]:
     返回与 modem_manager.list_modems() 单条记录兼容的字典。
     mm_object_path 使用合成路径 'zte:192.168.0.1'。
     """
-    iface = _find_zte_interface()
-    if not iface or not _ensure_interface_up(iface):
+    # 尝试直接连接（容器内通过路由可达宿主机 ZTE 接口）
+    # 若无法连接，再尝试拉起接口
+    status = _get(STATUS_CMDS)
+    if status is None:
+        iface = _find_zte_interface()
+        if iface:
+            _ensure_interface_up(iface)
+            status = _get(STATUS_CMDS)
+    if status is None:
         return None
 
-    status = _get(STATUS_CMDS)
     info = _get(INFO_CMDS)
 
     if not status:
@@ -183,6 +222,7 @@ def get_modem_info() -> Optional[dict]:
     if not info:
         info = {}
 
+    iface = _find_zte_interface() or "zte-usb"
     operator = (
         status.get("spn_name_data") or
         status.get("plmn_name") or
@@ -191,7 +231,7 @@ def get_modem_info() -> Optional[dict]:
 
     return {
         "mm_object_path": f"zte:{ZTE_DEFAULT_GATEWAY}",
-        "device_path": f"/sys/class/net/{iface}",
+        "device_path": f"net/{iface}",
         "imei": info.get("imei") or "",
         "manufacturer": "ZTE",
         "model": info.get("device_model") or "ZTE MiFi",
