@@ -1,10 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { format } from 'date-fns'
-import { ArrowDownLeft, ArrowUpRight } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, Copy, Check } from 'lucide-react'
 import { getMessagesApi, SmsMessage } from '../api/sms'
 import { useModemStore } from '../store/modemStore'
 import { useT } from '../i18n'
 import clsx from 'clsx'
+
+function CopyableContent({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }, [text])
+  return (
+    <div className="flex items-center gap-2 group max-w-xs">
+      <span className="truncate text-gray-300" title={text}>{text}</span>
+      <button
+        onClick={copy}
+        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-200"
+      >
+        {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+      </button>
+    </div>
+  )
+}
 
 const statusColors: Record<string, string> = {
   sent: 'text-green-400',
@@ -85,7 +106,7 @@ export default function SmsHistory() {
                     }
                   </td>
                   <td className="px-4 py-3 text-gray-200">{m.phone_number}</td>
-                  <td className="px-4 py-3 text-gray-300 max-w-xs truncate">{m.content}</td>
+                  <td className="px-4 py-3"><CopyableContent text={m.content} /></td>
                   <td className={clsx('px-4 py-3', statusColors[m.status])}>{m.status}</td>
                   <td className="px-4 py-3 text-gray-400">
                     {format(new Date(m.created_at), 'MM-dd HH:mm')}
