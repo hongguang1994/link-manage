@@ -234,7 +234,7 @@ INSERT OR IGNORE INTO users (id, username, password_hash, role, is_active, creat
 VALUES (
     1,
     'admin',
-    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQyCjAfozXjILsDNInWYlGFGK',
+    '$2b$12$J.PGYM99.G2T1/1wseKWI.HTcy.JskTr.4O5/ihgYUHnSU.NUefai',
     'admin',
     1,
     datetime('now'),
