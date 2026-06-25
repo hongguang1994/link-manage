@@ -13,6 +13,7 @@ from app.models.modem import Modem, ModemStatus
 from app.models.sms import SmsMessage, SmsDirection, SmsStatus
 from app.services import modem_manager
 from app.services.notify import push
+# ZTE 驱动为可选依赖，导入失败时降级为仅 mmcli 模式
 try:
     from app.services import zte_http_modem as _zte
     _ZTE_AVAILABLE = True
@@ -44,7 +45,8 @@ def stop_polling():
 async def _poll():
     detected = modem_manager.list_modems()
 
-    # Supplement with ZTE HTTP devices
+    # ZTE HTTP 调用是阻塞 I/O，必须用 run_in_executor 以免阻塞事件循环
+    # "_source": "zte" 标记用于后续区分收件箱读取路径
     if _ZTE_AVAILABLE:
         try:
             zte_info = await asyncio.get_event_loop().run_in_executor(
@@ -69,6 +71,7 @@ async def _poll():
             modem.device_path = info.get("device_path", "")
             modem.manufacturer = info.get("manufacturer", "")
             modem.model = info.get("model", "")
+            # IMEI 有时轮询为空（设备初始化中），保留上次已知值
             modem.imei = info.get("imei") or modem.imei
             modem.operator = info.get("operator", "")
             modem.signal_quality = info.get("signal_quality", 0)
@@ -124,6 +127,8 @@ async def _ingest_zte_inbox(db: Session, modem: Modem):
         return
     for msg in messages:
         sms_index = msg["index"]
+        # 去重键：(modem_id, mm_sms_index, direction=inbound)
+        # ZTE 使用设备内部 id 作为 sms_index，重启设备后可能复用
         existing = db.query(SmsMessage).filter(
             SmsMessage.modem_id == modem.id,
             SmsMessage.mm_sms_index == sms_index,

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional, List
+# 直接使用 bcrypt，不用 passlib：passlib 在 Python 3.13 上有兼容性问题
 import bcrypt
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
@@ -31,6 +32,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    # User 模型在函数内导入以避免循环引用（security ← models ← security）
     from app.models.user import User
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -62,6 +64,12 @@ def _perm(user):
     """Return merged permission dict from user's RBAC roles.
     Admin users bypass all checks — callers should check user.role == ADMIN first.
     Returns None if user has no roles assigned.
+
+    多角色合并规则：
+    - 正向标志（can_*）取并集（any）
+    - read_only 取交集（all）：所有角色均只读才限制
+    - allowed_modem_ids：仅考虑审批员角色的 modem_scope；
+      任意一个审批员角色 scope 为空 → None（不限制）
     """
     from app.models.user import UserRole
     if user.role == UserRole.ADMIN:
@@ -77,15 +85,15 @@ def _perm(user):
     if not roles:
         return None
 
-    # allowed_modem_ids is now a property reading from role_modem_scope
-    # None (empty scope) = unrestricted for approvers / no auto-grant for regular roles
+    # modem_scope 来自 role_modem_scope 关联表（替代原 JSON allowed_modem_ids 列）
+    # None = 不限制（审批员语义）；空列表 = 未配置范围（普通角色无自动授权）
     approver_roles = [r for r in roles if r.can_approve_requests]
     if approver_roles and any(not r.modem_scope for r in approver_roles):
-        modem_ids = None   # at least one unrestricted approver role → unrestricted
+        modem_ids = None   # 至少一个审批员角色无范围限制 → 全局权限
     elif approver_roles:
         modem_ids = list({m.id for r in approver_roles for m in r.modem_scope}) or None
     else:
-        modem_ids = None   # no approver roles → None (not used for approver scope)
+        modem_ids = None   # 无审批员角色，此字段对普通角色无意义
 
     return {
         "can_view_sim":         any(r.can_view_sim for r in roles),
@@ -99,9 +107,16 @@ def _perm(user):
 
 def get_user_modem_grants(user_id: int, db: Session, level: Optional[str] = None, user=None) -> List[int]:
     """Return modem IDs the user has access to.
-    Queries sim_grants (current effective grants) plus role-based auto-grants.
-    level=None → any grant (view or use)
-    level='use' → only use-level grants
+
+    来源（取并集）：
+    1. sim_grants 表中未过期的显式授权记录
+    2. 审批员角色的 modem_scope（自动拥有使用权，无需提交申请）
+    3. 普通角色配置了 modem_scope 时，scope 内的卡自动授权
+
+    level=None → 任意权限（view 或 use）
+    level='use' → 仅返回 use 级别的授权（用于发短信权限校验）
+
+    注意：user 参数传入时才计算角色自动授权；WS 连接等场景必须传入 user
     """
     from app.models.sim_request import SimGrant, PermissionLevel
     from app.models.modem import Modem

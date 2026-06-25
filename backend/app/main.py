@@ -6,9 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.models import user, support, notification  # ensure tables are created
-from app.models import role as role_model  # ensure roles table is created
-from app.models import sim_request as sim_request_model  # ensure sim_access_requests table is created
+# 显式导入所有 model 模块，确保 SQLAlchemy 在 create_all 前完成元数据注册
+# 若省略这些导入，对应表将不会被 Base.metadata.create_all 创建
+from app.models import user, support, notification
+from app.models import role as role_model
+from app.models import sim_request as sim_request_model
 from app.api import modems, sms
 from app.api.auth import router as auth_router
 from app.api.captcha import router as captcha_router
@@ -26,6 +28,8 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # create_all 必须在 scheduler/poller 启动前执行，确保表已存在
+    # 无 Alembic 迁移：新字段需手动执行 migrate_*.py 脚本
     Base.metadata.create_all(bind=engine)
     scheduler_start()
     poller_task = asyncio.create_task(modem_poller.start_polling())

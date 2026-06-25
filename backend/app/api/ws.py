@@ -18,7 +18,9 @@ _clients: list[WebSocket] = []
 
 @router.websocket("/ws/modems")
 async def modem_status_ws(websocket: WebSocket, token: str = ""):
-    # Validate JWT before accepting
+    # JWT 必须在 websocket.accept() 之前验证：
+    # FastAPI WebSocket 不支持 HTTP 401 响应，只能在握手前 close(4001) 拒绝
+    # token 通过 URL query string 传入（浏览器 WS API 不支持自定义 Header）
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
@@ -32,11 +34,12 @@ async def modem_status_ws(websocket: WebSocket, token: str = ""):
                 await websocket.close(code=4001)
                 return
             is_admin = user.role == UserRole.ADMIN
-            # Pre-compute visible modem IDs for non-admin users
+            # 连接建立时预计算可见设备集合，避免每次推送都查询权限
+            # visible_ids=None 表示管理员可见全部设备
             if not is_admin:
                 visible_ids = set(get_user_modem_grants(user.id, db, user=user))
             else:
-                visible_ids = None  # None = all
+                visible_ids = None
         finally:
             db.close()
     except JWTError:

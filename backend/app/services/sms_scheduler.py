@@ -60,6 +60,7 @@ def _schedule_task(task: SmsScheduledTask, db: Session):
     if task.cron_expression:
         trigger = CronTrigger.from_crontab(task.cron_expression)
     elif task.send_once_at:
+        # DateTrigger 接收 naive datetime 时视为 UTC，与前端提交的 toISOString() 一致
         trigger = DateTrigger(run_date=task.send_once_at)
     else:
         logger.warning(f"Task {task.id} has no schedule, skipping")
@@ -73,6 +74,7 @@ def _schedule_task(task: SmsScheduledTask, db: Session):
         replace_existing=True,
     )
     if job.next_run_time:
+        # SQLite 不存储时区，去掉 tzinfo 再写入
         task.next_run_at = job.next_run_time.replace(tzinfo=None)
         db.commit()
     logger.info(f"Scheduled task {task.id} ({task.name})")
@@ -145,6 +147,7 @@ async def execute_task(task_id: int):
 
         task.last_run_at = datetime.utcnow()
         task.run_count = (task.run_count or 0) + 1
+        # 单次任务执行后更新状态：全部失败→FAILED，否则→COMPLETED（含部分成功）
         if task.send_once_at:
             task.status = TaskStatus.FAILED if fail_count == len(recipients) else TaskStatus.COMPLETED
         db.commit()

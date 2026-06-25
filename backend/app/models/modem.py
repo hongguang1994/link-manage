@@ -16,8 +16,12 @@ class Modem(Base):
     __tablename__ = "modems"
 
     id = Column(Integer, primary_key=True, index=True)
-    device_path = Column(String(100))                               # e.g. /dev/ttyUSB0
-    mm_object_path = Column(String(200), unique=True, nullable=False)  # ModemManager D-Bus path
+    device_path = Column(String(100))
+    # mm_object_path 是设备唯一键，格式：
+    #   标准 mmcli 设备：/org/freedesktop/ModemManager1/Modem/<n>
+    #   ZTE 随身 WiFi：  zte:192.168.0.1（合成路径，非 D-Bus）
+    # 不要用 device_path 或 imei 作唯一标识（可能为空或在设备重启后变更）
+    mm_object_path = Column(String(200), unique=True, nullable=False)
     imei = Column(String(20), unique=True)
     manufacturer = Column(String(100))
     model = Column(String(100))

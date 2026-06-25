@@ -116,6 +116,7 @@ def _get_bearer_stats(idx: str) -> dict:
 
 
 def _get_phone_number(idx: str) -> str:
+    # AT+CNUM 通过 mmcli 透传 AT 命令给调制解调器，部分 SIM 卡不支持此命令会返回空
     code, out, err = _run(["mmcli", "-m", idx, "--command=AT+CNUM", "-J"])
     if code != 0:
         return ""
@@ -142,16 +143,23 @@ def _map_state(state: str) -> str:
 
 
 def send_sms(mm_index: str, phone_number: str, text: str) -> tuple[bool, str]:
-    """Send an SMS via a specific modem. Returns (success, message)."""
-    # mmcli parses --messaging-create-sms value on commas; wrap text in quotes
-    # so the internal parser treats everything after text=" as one value.
+    """Send an SMS via a specific modem. Returns (success, message).
+
+    mmcli 短信发送是三步对象操作（非单条命令）：
+    1. --messaging-create-sms  → 创建 SMS 对象，得到 /SMS/<n> 路径
+    2. -s <n> --send            → 实际发送
+    3. -s <n> --delete          → 清理已发送对象（否则占用设备内存）
+
+    --messaging-create-sms 的值按逗号解析，text 内若含逗号会被截断，
+    故用 text="..." 引号形式将内容作为整体传入。
+    """
     escaped = text.replace('"', '\\"')
     cmd = ["mmcli", "-m", mm_index, f'--messaging-create-sms=number={phone_number},text="{escaped}"']
     code, out, err = _run(cmd)
     if code != 0:
         return False, err
 
-    # Extract SMS index from output like "SMS /org/.../SMS/0 successfully created"
+    # 从输出 "SMS /org/.../SMS/0 successfully created" 中提取短信对象索引
     match = re.search(r"/SMS/(\d+)", out)
     if not match:
         return False, "Could not find created SMS index"
@@ -161,7 +169,6 @@ def send_sms(mm_index: str, phone_number: str, text: str) -> tuple[bool, str]:
     if code2 != 0:
         return False, err2
 
-    # Cleanup sent message
     _run(["mmcli", "-m", mm_index, "-s", sms_idx, "--delete"])
     return True, "sent"
 
