@@ -74,10 +74,8 @@ CREATE TABLE IF NOT EXISTS sim_access_requests (
     modem_id         INTEGER    NOT NULL,
     status           VARCHAR(8) NOT NULL DEFAULT 'pending',
     requested_level  VARCHAR(4) NOT NULL DEFAULT 'use',
-    granted_level    VARCHAR(4),
     reason           TEXT,
     admin_note       TEXT,
-    expires_at       DATETIME,
     created_at       DATETIME,
     updated_at       DATETIME,
     PRIMARY KEY (id),
@@ -86,6 +84,26 @@ CREATE TABLE IF NOT EXISTS sim_access_requests (
 );
 CREATE INDEX IF NOT EXISTS ix_sim_access_requests_id      ON sim_access_requests (id);
 CREATE INDEX IF NOT EXISTS ix_sim_access_requests_user_id ON sim_access_requests (user_id);
+
+CREATE TABLE IF NOT EXISTS sim_grants (
+    id              INTEGER    NOT NULL,
+    user_id         INTEGER    NOT NULL,
+    modem_id        INTEGER    NOT NULL,
+    granted_level   VARCHAR(4) NOT NULL DEFAULT 'use',
+    expires_at      DATETIME,
+    granted_by_id   INTEGER,
+    request_id      INTEGER,
+    created_at      DATETIME,
+    updated_at      DATETIME,
+    PRIMARY KEY (id),
+    UNIQUE (user_id, modem_id),
+    FOREIGN KEY (user_id)       REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (modem_id)      REFERENCES modems (id) ON DELETE CASCADE,
+    FOREIGN KEY (granted_by_id) REFERENCES users (id),
+    FOREIGN KEY (request_id)    REFERENCES sim_access_requests (id)
+);
+CREATE INDEX IF NOT EXISTS ix_sim_grants_id      ON sim_grants (id);
+CREATE INDEX IF NOT EXISTS ix_sim_grants_user_id ON sim_grants (user_id);
 
 CREATE TABLE IF NOT EXISTS sms_scheduled_tasks (
     id              INTEGER      NOT NULL,

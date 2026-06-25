@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Wifi, WifiOff, AlertCircle, HelpCircle, RefreshCw, CheckCircle, Clock, X, Lock } from 'lucide-react'
 import clsx from 'clsx'
 import { getAvailableModemsApi, type Modem } from '../api/modems'
-import { mySimRequestsApi, createSimRequestApi, type SimAccessRequest, type PermissionLevel } from '../api/simRequests'
+import { mySimRequestsApi, myGrantsApi, createSimRequestApi, type SimAccessRequest, type SimGrant, type PermissionLevel } from '../api/simRequests'
 import { useAuthStore } from '../store/authStore'
 import { useLangStore } from '../store/langStore'
 
@@ -37,28 +37,30 @@ function getRoleGrantedIds(roles: any[]): Set<number> {
   return ids
 }
 
-/** Status from explicit request records only */
-function getRequestStatus(modemId: number, requests: SimAccessRequest[]): AccessStatus {
-  const now = new Date()
-  const approved = requests.find(r => r.modem_id === modemId && r.status === 'approved' && (!r.expires_at || new Date(r.expires_at) > now))
-  if (approved) return approved.granted_level === 'use' ? 'use' : 'view'
-  if (requests.find(r => r.modem_id === modemId && r.status === 'pending')) return 'pending'
-  if (requests.find(r => r.modem_id === modemId && r.status === 'approved' && r.expires_at && new Date(r.expires_at) <= now)) return 'expired'
-  return 'none'
-}
-
 /** Effective status for the current user — single source of truth */
 function getEffectiveStatus(
   modemId: number,
   isAdmin: boolean,
   approverScope: ApproverScope,
   roleGrantedIds: Set<number>,
+  grants: SimGrant[],
   requests: SimAccessRequest[]
 ): AccessStatus {
   if (isAdmin) return 'use'
   if (approverScope === 'all' || (approverScope instanceof Set && approverScope.has(modemId))) return 'use'
   if (roleGrantedIds.has(modemId)) return 'use'
-  return getRequestStatus(modemId, requests)
+
+  // Check sim_grants (authoritative grant record)
+  const now = new Date()
+  const grant = grants.find(g => g.modem_id === modemId)
+  if (grant) {
+    if (grant.expires_at && new Date(grant.expires_at) <= now) return 'expired'
+    return grant.granted_level === 'use' ? 'use' : 'view'
+  }
+
+  // Check request status for pending indicator
+  if (requests.find(r => r.modem_id === modemId && r.status === 'pending')) return 'pending'
+  return 'none'
 }
 
 const ACCESS_BADGE: Record<AccessStatus, { label: string; cls: string }> = {
@@ -153,6 +155,7 @@ export default function ResourceLibrary() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const [modems, setModems] = useState<Modem[]>([])
+  const [grants, setGrants] = useState<SimGrant[]>([])
   const [requests, setRequests] = useState<SimAccessRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [applyTarget, setApplyTarget] = useState<Modem | null>(null)
@@ -163,11 +166,13 @@ export default function ResourceLibrary() {
   const load = async () => {
     setLoading(true)
     try {
-      const [mRes, rRes] = await Promise.all([
+      const [mRes, gRes, rRes] = await Promise.all([
         getAvailableModemsApi(),
+        isAdmin ? Promise.resolve({ data: [] as SimGrant[] }) : myGrantsApi(),
         isAdmin ? Promise.resolve({ data: [] as SimAccessRequest[] }) : mySimRequestsApi(),
       ])
       setModems(mRes.data)
+      setGrants(gRes.data)
       setRequests(rRes.data)
     } finally { setLoading(false) }
   }
@@ -199,7 +204,7 @@ export default function ResourceLibrary() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {modems.map(m => {
-            const effectiveStatus = getEffectiveStatus(m.id, isAdmin, approverScope, roleGrantedIds, requests)
+            const effectiveStatus = getEffectiveStatus(m.id, isAdmin, approverScope, roleGrantedIds, grants, requests)
             const badge = ACCESS_BADGE[effectiveStatus]
             const modemCfg = STATUS_CFG[m.status as keyof typeof STATUS_CFG] ?? STATUS_CFG.unknown
             const Icon = modemCfg.icon

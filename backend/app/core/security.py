@@ -94,21 +94,19 @@ def _perm(user):
 
 def get_user_modem_grants(user_id: int, db: Session, level: Optional[str] = None, user=None) -> List[int]:
     """Return modem IDs the user has access to.
-    For approvers, their managed cards (allowed_modem_ids) are automatically included at use level.
+    Queries sim_grants (current effective grants) plus role-based auto-grants.
     level=None → any grant (view or use)
     level='use' → only use-level grants
     """
-    from app.models.sim_request import SimAccessRequest, RequestStatus, PermissionLevel
+    from app.models.sim_request import SimGrant, PermissionLevel
     from app.models.modem import Modem
     now = datetime.utcnow()
-    q = db.query(SimAccessRequest.modem_id).filter(
-        SimAccessRequest.user_id == user_id,
-        SimAccessRequest.status == RequestStatus.APPROVED,
-        or_(SimAccessRequest.expires_at.is_(None), SimAccessRequest.expires_at > now),
-        SimAccessRequest.granted_level.isnot(None),
+    q = db.query(SimGrant.modem_id).filter(
+        SimGrant.user_id == user_id,
+        or_(SimGrant.expires_at.is_(None), SimGrant.expires_at > now),
     )
     if level == "use":
-        q = q.filter(SimAccessRequest.granted_level == PermissionLevel.USE)
+        q = q.filter(SimGrant.granted_level == PermissionLevel.USE)
     grant_ids = set(r.modem_id for r in q.all())
 
     if user is not None:

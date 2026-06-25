@@ -4,7 +4,7 @@ import { useModemStore } from '../store/modemStore'
 import { sendSmsApi, getTemplatesApi, SmsTemplate } from '../api/sms'
 import { useT } from '../i18n'
 import { useAuthStore } from '../store/authStore'
-import { mySimRequestsApi, type SimAccessRequest } from '../api/simRequests'
+import { myGrantsApi, type SimGrant } from '../api/simRequests'
 
 function extractVars(content: string): string[] {
   const matches = content.match(/\{(\w+)\}/g) || []
@@ -131,21 +131,16 @@ export default function SmsSend() {
   const [templates, setTemplates] = useState<SmsTemplate[]>([])
   const [showPicker, setShowPicker] = useState(false)
   const [pendingTpl, setPendingTpl] = useState<SmsTemplate | null>(null)
-  const [myRequests, setMyRequests] = useState<SimAccessRequest[]>([])
+  const [myGrants, setMyGrants] = useState<SimGrant[]>([])
 
   useEffect(() => {
     getTemplatesApi().then(r => setTemplates(r.data)).catch(() => {})
     if (!isAdmin) {
-      mySimRequestsApi().then(r => setMyRequests(r.data)).catch(() => {})
+      myGrantsApi().then(r => setMyGrants(r.data)).catch(() => {})
     }
   }, [isAdmin])
 
-  const now = new Date()
-  const useGrantedIds = new Set(
-    myRequests
-      .filter(r => r.status === 'approved' && r.granted_level === 'use' && (!r.expires_at || new Date(r.expires_at) > now))
-      .map(r => r.modem_id)
-  )
+  const useGrantedIds = new Set(myGrants.filter(g => g.granted_level === 'use').map(g => g.modem_id))
 
   // Approvers: 'all' = unrestricted, Set = managed IDs, null = not an approver
   const approverManagedIds: Set<number> | 'all' | null = (() => {

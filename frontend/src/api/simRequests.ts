@@ -16,7 +16,17 @@ export interface SimAccessRequest {
   updated_at: string | null
   is_expired: boolean
   requested_level: PermissionLevel
-  granted_level: PermissionLevel | null
+  granted_level: PermissionLevel | null   // from joined sim_grants, null if no grant yet
+}
+
+export interface SimGrant {
+  id: number
+  user_id: number
+  modem_id: number
+  granted_level: PermissionLevel
+  expires_at: string | null
+  is_expired: boolean
+  created_at: string | null
 }
 
 export const createSimRequestApi = (modem_id: number, reason?: string, requested_level: PermissionLevel = 'use') =>
@@ -24,6 +34,9 @@ export const createSimRequestApi = (modem_id: number, reason?: string, requested
 
 export const mySimRequestsApi = () =>
   client.get<SimAccessRequest[]>('/sim-requests/my')
+
+export const myGrantsApi = () =>
+  client.get<SimGrant[]>('/sim-requests/my-grants')
 
 export const listSimRequestsApi = (status?: string) =>
   client.get<SimAccessRequest[]>('/sim-requests/', { params: status ? { status } : {} })
@@ -36,3 +49,6 @@ export const rejectSimRequestApi = (id: number, admin_note?: string) =>
 
 export const batchApproveApi = (ids: number[], expires_at?: string | null, admin_note?: string, granted_level: PermissionLevel = 'use') =>
   client.post('/sim-requests/batch-approve', { ids, expires_at: expires_at ?? null, admin_note, granted_level })
+
+export const revokeGrantApi = (grant_id: number) =>
+  client.delete(`/sim-requests/grants/${grant_id}`)

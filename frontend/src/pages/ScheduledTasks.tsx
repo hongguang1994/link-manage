@@ -8,7 +8,7 @@ import { useModemStore } from '../store/modemStore'
 import { useT } from '../i18n'
 import clsx from 'clsx'
 import { useAuthStore } from '../store/authStore'
-import { mySimRequestsApi, type SimAccessRequest } from '../api/simRequests'
+import { myGrantsApi, type SimGrant } from '../api/simRequests'
 
 const statusBadge: Record<string, string> = {
   active: 'bg-green-900 text-green-300',
@@ -147,7 +147,7 @@ function CreateModal({ onClose, onCreated, useGrantedIds }: { onClose: () => voi
 export default function ScheduledTasks() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
   const [showCreate, setShowCreate] = useState(false)
-  const [myRequests, setMyRequests] = useState<SimAccessRequest[]>([])
+  const [myGrants, setMyGrants] = useState<SimGrant[]>([])
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const t = useT()
@@ -156,16 +156,9 @@ export default function ScheduledTasks() {
   useEffect(() => {
     load()
     if (!isAdmin) {
-      mySimRequestsApi().then(r => setMyRequests(r.data)).catch(() => {})
+      myGrantsApi().then(r => setMyGrants(r.data)).catch(() => {})
     }
   }, [isAdmin])
-
-  const now = new Date()
-  const grantedFromRequests = new Set(
-    myRequests
-      .filter(r => r.status === 'approved' && r.granted_level === 'use' && (!r.expires_at || new Date(r.expires_at) > now))
-      .map(r => r.modem_id)
-  )
 
   // null = unrestricted (admin or unrestricted approver), Set = specific allowed IDs
   const useGrantedIds: Set<number> | null = (() => {
@@ -173,9 +166,8 @@ export default function ScheduledTasks() {
     const roles = user?.rbac_roles ?? []
     const approverRoles = roles.filter((r: any) => r.can_approve_requests)
     if (approverRoles.some((r: any) => r.allowed_modem_ids == null)) return null
-    const ids = new Set(grantedFromRequests)
+    const ids = new Set(myGrants.filter(g => g.granted_level === 'use').map(g => g.modem_id))
     approverRoles.forEach((r: any) => (r.allowed_modem_ids ?? []).forEach((id: number) => ids.add(id)))
-    // Non-approver roles with explicit allowed_modem_ids
     roles.filter((r: any) => !r.can_approve_requests && r.allowed_modem_ids != null)
       .forEach((r: any) => (r.allowed_modem_ids as number[]).forEach((id: number) => ids.add(id)))
     return ids
