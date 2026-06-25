@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.security import require_admin
 from app.models.role import Role
+from app.models.modem import Modem
 from app.models.user import User
 from app.schemas.role import RoleCreate, RoleUpdate, RoleOut
 
@@ -13,6 +14,15 @@ router = APIRouter(prefix="/roles", tags=["roles"])
 
 class SetRolesBody(BaseModel):
     role_ids: List[int]
+
+
+def _apply_modem_scope(role: Role, allowed_modem_ids, db: Session):
+    """Sync role.modem_scope from an allowed_modem_ids list (or None to clear)."""
+    if allowed_modem_ids is None:
+        role.modem_scope = []
+    else:
+        modems = db.query(Modem).filter(Modem.id.in_(allowed_modem_ids)).all() if allowed_modem_ids else []
+        role.modem_scope = modems
 
 
 @router.get("/", response_model=List[RoleOut], dependencies=[Depends(require_admin)])
@@ -24,8 +34,11 @@ def list_roles(db: Session = Depends(get_db)):
 def create_role(data: RoleCreate, db: Session = Depends(get_db)):
     if db.query(Role).filter(Role.name == data.name).first():
         raise HTTPException(status_code=400, detail="角色名称已存在")
-    role = Role(**data.model_dump())
+    dump = data.model_dump(exclude={"allowed_modem_ids"})
+    role = Role(**dump)
     db.add(role)
+    db.flush()  # get role.id before setting relationships
+    _apply_modem_scope(role, data.allowed_modem_ids, db)
     db.commit()
     db.refresh(role)
     return role
@@ -36,7 +49,10 @@ def update_role(role_id: int, data: RoleUpdate, db: Session = Depends(get_db)):
     role = db.query(Role).filter(Role.id == role_id).first()
     if not role:
         raise HTTPException(status_code=404, detail="角色不存在")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    fields = data.model_dump(exclude_unset=True)
+    if "allowed_modem_ids" in fields:
+        _apply_modem_scope(role, fields.pop("allowed_modem_ids"), db)
+    for field, value in fields.items():
         setattr(role, field, value)
     db.commit()
     db.refresh(role)

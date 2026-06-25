@@ -81,10 +81,17 @@ def _fmt_grant(g: SimGrant):
 
 
 def _approver_modem_scope(approver, db: Session) -> Optional[List[int]]:
+    """Return modem IDs this approver can manage, or None for unrestricted."""
     if approver.role == UserRole.ADMIN:
         return None
-    p = _perm(approver)
-    return p.get("allowed_modem_ids") if p else []
+    roles = getattr(approver, "rbac_roles", None) or []
+    approver_roles = [r for r in roles if r.can_approve_requests]
+    if not approver_roles:
+        return []
+    # If any approver role has empty scope → unrestricted
+    if any(not r.modem_scope for r in approver_roles):
+        return None
+    return list({m.id for r in approver_roles for m in r.modem_scope})
 
 
 def _upsert_grant(db: Session, user_id: int, modem_id: int,

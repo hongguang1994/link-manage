@@ -26,13 +26,20 @@ CREATE TABLE IF NOT EXISTS roles (
     can_view_history      BOOLEAN,
     read_only             BOOLEAN,
     can_support           BOOLEAN,
-    allowed_modem_ids     JSON,
     created_at            DATETIME,
     updated_at            DATETIME,
     PRIMARY KEY (id),
     UNIQUE (name)
 );
 CREATE INDEX IF NOT EXISTS ix_roles_id ON roles (id);
+
+CREATE TABLE IF NOT EXISTS role_modem_scope (
+    role_id  INTEGER NOT NULL,
+    modem_id INTEGER NOT NULL,
+    PRIMARY KEY (role_id, modem_id),
+    FOREIGN KEY (role_id)  REFERENCES roles (id)  ON DELETE CASCADE,
+    FOREIGN KEY (modem_id) REFERENCES modems (id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS user_roles (
     user_id INTEGER NOT NULL,

@@ -77,10 +77,15 @@ def _perm(user):
     if not roles:
         return None
 
-    if any(r.allowed_modem_ids is None for r in roles):
-        modem_ids = None
+    # allowed_modem_ids is now a property reading from role_modem_scope
+    # None (empty scope) = unrestricted for approvers / no auto-grant for regular roles
+    approver_roles = [r for r in roles if r.can_approve_requests]
+    if approver_roles and any(not r.modem_scope for r in approver_roles):
+        modem_ids = None   # at least one unrestricted approver role → unrestricted
+    elif approver_roles:
+        modem_ids = list({m.id for r in approver_roles for m in r.modem_scope}) or None
     else:
-        modem_ids = list({mid for r in roles for mid in (r.allowed_modem_ids or [])}) or None
+        modem_ids = None   # no approver roles → None (not used for approver scope)
 
     return {
         "can_view_sim":         any(r.can_view_sim for r in roles),
@@ -112,16 +117,17 @@ def get_user_modem_grants(user_id: int, db: Session, level: Optional[str] = None
     if user is not None:
         roles = getattr(user, "rbac_roles", None) or []
         for role in roles:
+            scope_ids = [m.id for m in role.modem_scope]
             if role.can_approve_requests:
-                # Approvers automatically have use-level access to their managed cards
-                if role.allowed_modem_ids is None:
+                if not scope_ids:
+                    # Empty scope = unrestricted approver → all modems
                     all_ids = [r.id for r in db.query(Modem.id).all()]
                     grant_ids.update(all_ids)
                 else:
-                    grant_ids.update(role.allowed_modem_ids)
-            elif role.allowed_modem_ids is not None:
-                # Non-approver roles: explicit allowed_modem_ids = auto-grant access to those cards
-                grant_ids.update(role.allowed_modem_ids)
+                    grant_ids.update(scope_ids)
+            elif scope_ids:
+                # Non-approver roles: explicit scope = auto-grant those cards
+                grant_ids.update(scope_ids)
 
     return list(grant_ids)
 
