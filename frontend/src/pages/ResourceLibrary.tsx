@@ -92,10 +92,10 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4" style={{ zIndex: 9999 }} onClick={onClose}>
       <div
         className="w-full max-w-md rounded-2xl overflow-hidden"
-        style={{ background: '#0d1b30', border: '1px solid rgba(59,130,246,0.35)', boxShadow: '0 0 40px rgba(59,130,246,0.2), 0 25px 60px rgba(0,0,0,0.5)' }}
+        style={{ background: 'var(--surface-2)', border: '1px solid var(--border-default)', boxShadow: '0 0 40px rgba(59,130,246,0.2), 0 25px 60px rgba(0,0,0,0.5)' }}
         onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(59,130,246,0.15)', background: 'rgba(59,130,246,0.06)' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-header)' }}>
           <div>
             <h2 className="text-base font-semibold text-white">申请权限</h2>
             <p className="text-xs text-blue-300/60 mt-0.5">
@@ -130,7 +130,7 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
             value={reason} onChange={e => setReason(e.target.value)} rows={2}
             placeholder="简单说明使用用途..."
             className="w-full rounded-xl px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500/60 placeholder-gray-600"
-            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(59,130,246,0.2)' }}
+            style={{ background: 'var(--surface-input)', border: '1px solid var(--border-input)' }}
           />
         </div>
 
@@ -214,7 +214,7 @@ export default function ResourceLibrary() {
               <div key={m.id}
                 className="sim-card relative overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5 group"
                 style={{
-                  background: 'rgba(13,27,48,0.75)',
+                  background: 'var(--card-bg)',
                   backdropFilter: 'blur(20px)',
                   border: `1px solid ${effectiveStatus === 'use' ? 'rgba(52,211,153,0.2)' : effectiveStatus === 'pending' ? 'rgba(251,191,36,0.15)' : 'rgba(59,130,246,0.12)'}`,
                   boxShadow: effectiveStatus === 'use' ? '0 0 20px rgba(52,211,153,0.1)' : '0 0 20px rgba(59,130,246,0.06)',

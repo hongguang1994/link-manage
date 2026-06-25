@@ -131,12 +131,37 @@ html[data-theme="light"] .bg-gray-800  { background-color: #ffffff !important; }
 html[data-theme="light"] .bg-gray-750  { background-color: #f8fafc !important; }
 html[data-theme="light"] .bg-gray-700  { background-color: #e2e8f0 !important; }
 html[data-theme="light"] .bg-gray-600  { background-color: #cbd5e1 !important; }
-html[data-theme="light"] .text-white   { color: #0f172a !important; }
+html[data-theme="light"] .text-white    { color: #1c1c1e !important; }
 html[data-theme="light"] .text-gray-100 { color: #1e293b !important; }
 html[data-theme="light"] .text-gray-200 { color: #334155 !important; }
 html[data-theme="light"] .text-gray-300 { color: #475569 !important; }
 html[data-theme="light"] .text-gray-400 { color: #64748b !important; }
 html[data-theme="light"] .text-gray-500 { color: #94a3b8 !important; }
+
+/* Blue-tinted text (dark-mode accent) → readable gray in light mode */
+/* Primary values: blue-100/xx, blue-200/70+ */
+html[data-theme="light"] .text-blue-100\/70,
+html[data-theme="light"] .text-blue-100\/80,
+html[data-theme="light"] .text-blue-200\/70,
+html[data-theme="light"] .text-blue-200\/80 { color: #374151 !important; }
+
+/* Secondary labels: blue-200/50, blue-300/60 */
+html[data-theme="light"] .text-blue-200\/50,
+html[data-theme="light"] .text-blue-200\/60,
+html[data-theme="light"] .text-blue-300\/60,
+html[data-theme="light"] .text-blue-300\/70 { color: #636366 !important; }
+
+/* Muted / placeholder: blue-200/30, blue-200/40, blue-300/40, blue-300/50 */
+html[data-theme="light"] .text-blue-200\/30,
+html[data-theme="light"] .text-blue-200\/40,
+html[data-theme="light"] .text-blue-300\/30,
+html[data-theme="light"] .text-blue-300\/40,
+html[data-theme="light"] .text-blue-300\/50 { color: #8e8e93 !important; }
+
+/* Very muted: /20 and below */
+html[data-theme="light"] .text-blue-200\/20,
+html[data-theme="light"] .text-blue-300\/20,
+html[data-theme="light"] .text-blue-400\/20 { color: #aeaeb2 !important; }
 html[data-theme="light"] .border-gray-700 { border-color: #e2e8f0 !important; }
 html[data-theme="light"] .border-gray-600 { border-color: #cbd5e1 !important; }
 html[data-theme="light"] .hover\:bg-gray-700:hover { background-color: #e2e8f0 !important; }
@@ -179,6 +204,26 @@ html[data-theme="light"] .hover\:bg-gray-600:hover { background-color: #e5e5ea !
 /* Toggle switch: off-state gray */
 html[data-theme="light"] .bg-gray-600:not(input):not(select) { background-color: #d1d1d6 !important; }
 
+/* Indigo badges / chips — dark-theme deep indigo → Apple light indigo */
+html[data-theme="light"] .bg-indigo-900\/20,
+html[data-theme="light"] .bg-indigo-900\/40,
+html[data-theme="light"] .bg-indigo-900\/60 { background-color: #eef2ff !important; }
+html[data-theme="light"] .text-indigo-300,
+html[data-theme="light"] .text-indigo-400   { color: #4338ca !important; }
+html[data-theme="light"] .border-indigo-700\/40,
+html[data-theme="light"] .border-indigo-700\/50 { border-color: #c7d2fe !important; }
+html[data-theme="light"] .border-indigo-500 { border-color: #6366f1 !important; }
+html[data-theme="light"] .hover\:text-indigo-400:hover { color: #4f46e5 !important; }
+
+/* Purple badges — dark purple → Apple light purple */
+html[data-theme="light"] .bg-purple-900\/60 { background-color: #f5f3ff !important; }
+html[data-theme="light"] .text-purple-300   { color: #7c3aed !important; }
+html[data-theme="light"] .border-purple-700 { border-color: #ddd6fe !important; }
+
+/* Yellow / warning chips */
+html[data-theme="light"] .bg-yellow-900\/60 { background-color: #fefce8 !important; }
+html[data-theme="light"] .text-yellow-300   { color: #a16207 !important; }
+
 /* Disabled states */
 html[data-theme="light"] .disabled\:bg-gray-700:disabled { background-color: #e5e5ea !important; color: #aeaeb2 !important; }
 
@@ -187,21 +232,61 @@ html[data-theme="light"] .disabled\:bg-gray-700:disabled { background-color: #e5
 html[data-theme="light"] .layout-root { background: #f0f4ff !important; }
 html[data-theme="light"] .layout-orbs { display: none; }
 
-/* ── Card surface variables ─────────────────────────────────────────────────── */
+/* ── Design token variables ─────────────────────────────────────────────────── */
+/* All hardcoded dark colours in inline styles should reference these vars.     */
+/* Override the light block below — never patch individual components.          */
 :root {
+  /* Surfaces */
+  --surface-page:   #020c1b;
+  --surface-2:      #0d1b30;        /* modal body, sidebar, elevated card */
+  --surface-3:      rgba(7,18,34,0.95);  /* deeper modal / overlay */
+  --surface-header: rgba(59,130,246,0.06); /* modal / panel header tint */
+  --surface-input:  rgba(255,255,255,0.04); /* input / textarea fill */
+
+  /* Borders */
+  --border-default: rgba(59,130,246,0.35);
+  --border-subtle:  rgba(59,130,246,0.15);
+  --border-input:   rgba(59,130,246,0.2);
+
+  /* Text */
+  --text-primary:     #ffffff;
+  --text-secondary:   rgba(147,197,253,0.5);
+  --text-muted:       rgba(147,197,253,0.3);
+  --text-placeholder: #64748b;
+
+  /* Card (modem / stat card) */
   --card-bg: rgba(13,27,48,0.75);
-  --card-text-primary: #ffffff;
-  --card-text-secondary: rgba(147,197,253,0.5);   /* blue-200/50 */
-  --card-text-muted: rgba(147,197,253,0.3);        /* blue-200/30 */
-  --card-signal-empty: rgba(255,255,255,0.08);
+  --card-text-primary:   #ffffff;
+  --card-text-secondary: rgba(147,197,253,0.5);
+  --card-text-muted:     rgba(147,197,253,0.3);
+  --card-signal-empty:   rgba(255,255,255,0.08);
 }
 
 html[data-theme="light"] {
-  --card-bg: #ffffff;
-  --card-text-primary: #1c1c1e;
+  /* Surfaces */
+  --surface-page:   #f0f4ff;
+  --surface-2:      #ffffff;
+  --surface-3:      #f8fafc;
+  --surface-header: rgba(0,0,0,0.02);
+  --surface-input:  #f8fafc;
+
+  /* Borders */
+  --border-default: rgba(0,0,0,0.12);
+  --border-subtle:  #e2e8f0;
+  --border-input:   #e2e8f0;
+
+  /* Text */
+  --text-primary:     #1c1c1e;
+  --text-secondary:   #636366;
+  --text-muted:       #8e8e93;
+  --text-placeholder: #aeaeb2;
+
+  /* Card */
+  --card-bg:             #ffffff;
+  --card-text-primary:   #1c1c1e;
   --card-text-secondary: #636366;
-  --card-text-muted: #8e8e93;
-  --card-signal-empty: #e5e7eb;
+  --card-text-muted:     #8e8e93;
+  --card-signal-empty:   #e5e7eb;
 }
 
 /* ModemCard / Dashboard stat card — dark default, Apple-style light override */

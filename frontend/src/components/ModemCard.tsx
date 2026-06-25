@@ -28,7 +28,7 @@ const SignalBars = ({ quality }: { quality: number }) => {
     <div className="flex items-end gap-0.5 h-4">
       {[1,2,3,4,5].map(i => (
         <div key={i} className="w-1.5 rounded-sm transition-all"
-          style={{ height: `${i * 20}%`, background: i <= bars ? (colors[bars - 1] ?? '#34d399') : 'rgba(255,255,255,0.08)' }} />
+          style={{ height: `${i * 20}%`, background: i <= bars ? (colors[bars - 1] ?? '#34d399') : 'var(--card-signal-empty)' }} />
       ))}
     </div>
   )
