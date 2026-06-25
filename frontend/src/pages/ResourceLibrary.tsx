@@ -29,6 +29,14 @@ function getApproverScope(roles: any[]): ApproverScope {
   return ids
 }
 
+/** IDs auto-granted by non-approver roles that have explicit allowed_modem_ids */
+function getRoleGrantedIds(roles: any[]): Set<number> {
+  const ids = new Set<number>()
+  roles.filter(r => !r.can_approve_requests && r.allowed_modem_ids != null)
+    .forEach(r => (r.allowed_modem_ids as number[]).forEach(id => ids.add(id)))
+  return ids
+}
+
 /** Status from explicit request records only */
 function getRequestStatus(modemId: number, requests: SimAccessRequest[]): AccessStatus {
   const now = new Date()
@@ -44,10 +52,12 @@ function getEffectiveStatus(
   modemId: number,
   isAdmin: boolean,
   approverScope: ApproverScope,
+  roleGrantedIds: Set<number>,
   requests: SimAccessRequest[]
 ): AccessStatus {
   if (isAdmin) return 'use'
   if (approverScope === 'all' || (approverScope instanceof Set && approverScope.has(modemId))) return 'use'
+  if (roleGrantedIds.has(modemId)) return 'use'
   return getRequestStatus(modemId, requests)
 }
 
@@ -148,6 +158,7 @@ export default function ResourceLibrary() {
   const [applyTarget, setApplyTarget] = useState<Modem | null>(null)
 
   const approverScope = isAdmin ? null : getApproverScope(user?.rbac_roles ?? [])
+  const roleGrantedIds = isAdmin ? new Set<number>() : getRoleGrantedIds(user?.rbac_roles ?? [])
 
   const load = async () => {
     setLoading(true)
@@ -188,7 +199,7 @@ export default function ResourceLibrary() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {modems.map(m => {
-            const effectiveStatus = getEffectiveStatus(m.id, isAdmin, approverScope, requests)
+            const effectiveStatus = getEffectiveStatus(m.id, isAdmin, approverScope, roleGrantedIds, requests)
             const badge = ACCESS_BADGE[effectiveStatus]
             const modemCfg = STATUS_CFG[m.status as keyof typeof STATUS_CFG] ?? STATUS_CFG.unknown
             const Icon = modemCfg.icon

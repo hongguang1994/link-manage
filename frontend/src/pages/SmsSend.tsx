@@ -147,8 +147,7 @@ export default function SmsSend() {
       .map(r => r.modem_id)
   )
 
-  // Approvers automatically have use-level access to their managed cards
-  // Returns: 'all' = unrestricted approver, Set = specific managed IDs, null = not an approver
+  // Approvers: 'all' = unrestricted, Set = managed IDs, null = not an approver
   const approverManagedIds: Set<number> | 'all' | null = (() => {
     const roles = user?.rbac_roles ?? []
     const approverRoles = roles.filter((r: any) => r.can_approve_requests)
@@ -159,9 +158,19 @@ export default function SmsSend() {
     return ids
   })()
 
+  // Non-approver roles with explicit allowed_modem_ids grant use access
+  const roleGrantedIds = new Set<number>()
+  ;(user?.rbac_roles ?? [])
+    .filter((r: any) => !r.can_approve_requests && r.allowed_modem_ids != null)
+    .forEach((r: any) => (r.allowed_modem_ids as number[]).forEach((id: number) => roleGrantedIds.add(id)))
+
   const modems = isAdmin || approverManagedIds === 'all'
     ? allModems
-    : allModems.filter(m => useGrantedIds.has(m.id) || (approverManagedIds !== null && approverManagedIds.has(m.id)))
+    : allModems.filter(m =>
+        useGrantedIds.has(m.id) ||
+        roleGrantedIds.has(m.id) ||
+        (approverManagedIds !== null && approverManagedIds.has(m.id))
+      )
 
   const send = async () => {
     if (!modemId || !phone || !content) return

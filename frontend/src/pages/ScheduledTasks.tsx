@@ -167,15 +167,17 @@ export default function ScheduledTasks() {
       .map(r => r.modem_id)
   )
 
-  // Approvers automatically have use-level access to their managed cards
   // null = unrestricted (admin or unrestricted approver), Set = specific allowed IDs
   const useGrantedIds: Set<number> | null = (() => {
     if (isAdmin) return null
     const roles = user?.rbac_roles ?? []
     const approverRoles = roles.filter((r: any) => r.can_approve_requests)
-    if (approverRoles.some((r: any) => r.allowed_modem_ids == null)) return null // unrestricted approver
+    if (approverRoles.some((r: any) => r.allowed_modem_ids == null)) return null
     const ids = new Set(grantedFromRequests)
     approverRoles.forEach((r: any) => (r.allowed_modem_ids ?? []).forEach((id: number) => ids.add(id)))
+    // Non-approver roles with explicit allowed_modem_ids
+    roles.filter((r: any) => !r.can_approve_requests && r.allowed_modem_ids != null)
+      .forEach((r: any) => (r.allowed_modem_ids as number[]).forEach((id: number) => ids.add(id)))
     return ids
   })()
 

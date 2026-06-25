@@ -111,17 +111,19 @@ def get_user_modem_grants(user_id: int, db: Session, level: Optional[str] = None
         q = q.filter(SimAccessRequest.granted_level == PermissionLevel.USE)
     grant_ids = set(r.modem_id for r in q.all())
 
-    # Approvers automatically have use-level access to their managed cards
     if user is not None:
-        p = _perm(user)
-        if p and p.get("can_approve_requests"):
-            managed = p.get("allowed_modem_ids")
-            if managed is None:
-                # Unrestricted approver → all modem IDs
-                all_ids = [r.id for r in db.query(Modem.id).all()]
-                grant_ids.update(all_ids)
-            else:
-                grant_ids.update(managed)
+        roles = getattr(user, "rbac_roles", None) or []
+        for role in roles:
+            if role.can_approve_requests:
+                # Approvers automatically have use-level access to their managed cards
+                if role.allowed_modem_ids is None:
+                    all_ids = [r.id for r in db.query(Modem.id).all()]
+                    grant_ids.update(all_ids)
+                else:
+                    grant_ids.update(role.allowed_modem_ids)
+            elif role.allowed_modem_ids is not None:
+                # Non-approver roles: explicit allowed_modem_ids = auto-grant access to those cards
+                grant_ids.update(role.allowed_modem_ids)
 
     return list(grant_ids)
 

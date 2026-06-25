@@ -37,7 +37,10 @@ function ApproveModal({
   const [permanent, setPermanent] = useState(true)
   const [expiresAt, setExpiresAt] = useState('')
   const [adminNote, setAdminNote] = useState('')
-  const [grantedLevel, setGrantedLevel] = useState<PermissionLevel>('use')
+  // Default to the requested level — approver can upgrade/downgrade explicitly
+  const [grantedLevel, setGrantedLevel] = useState<PermissionLevel>(
+    items.length === 1 ? (items[0].requested_level ?? 'use') : 'use'
+  )
   const [loading, setLoading] = useState(false)
 
   const submit = async () => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ShieldCheck, Plus, Pencil, Trash2, X, Check, ChevronRight } from 'lucide-react'
 import clsx from 'clsx'
 import { listRolesApi, createRoleApi, updateRoleApi, deleteRoleApi, type RoleOut, type RoleCreate } from '../api/roles'
+import { getAvailableModemsApi, type Modem } from '../api/modems'
 import { useLangStore } from '../store/langStore'
 
 // ── System role i18n map ──────────────────────────────────────────────────────
@@ -57,6 +58,8 @@ function RoleModal({ role, onClose, onSaved, lang }: {
   )
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const [allModems, setAllModems] = useState<Modem[]>([])
+  useEffect(() => { getAvailableModemsApi().then(r => setAllModems(r.data)).catch(() => {}) }, [])
 
   const set = (k: keyof RoleCreate, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
@@ -115,6 +118,48 @@ function RoleModal({ role, onClose, onSaved, lang }: {
             <PermRow label={zh ? '查看短信记录' : 'View SMS history'} checked={form.can_view_history} onChange={v => set('can_view_history', v)} />
             <PermRow label={zh ? '回复用户咨询（客服权限）' : 'Reply to support chats'} checked={!!form.can_support} onChange={v => set('can_support', v)} />
           </div>
+
+          {/* SIM card binding */}
+          {allModems.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-gray-400">
+                  {form.can_approve_requests
+                    ? (zh ? '管辖的 SIM 卡（审批范围）' : 'Managed SIM cards (approval scope)')
+                    : (zh ? '自动授权的 SIM 卡' : 'Auto-granted SIM cards')}
+                </label>
+                <button type="button" onClick={() => set('allowed_modem_ids', form.allowed_modem_ids == null ? [] : null)}
+                  className="text-[10px] px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-white transition-colors">
+                  {form.allowed_modem_ids == null
+                    ? (zh ? '切换为指定卡' : 'Switch to specific')
+                    : (zh ? (form.can_approve_requests ? '切换为不限制' : '切换为不自动授权') : (form.can_approve_requests ? 'Switch to unlimited' : 'Switch to no auto-grant'))}
+                </button>
+              </div>
+              {form.allowed_modem_ids == null ? (
+                <p className="text-xs text-gray-500 italic">
+                  {form.can_approve_requests
+                    ? (zh ? '不限制 — 可审批所有SIM卡申请' : 'Unlimited — can approve all cards')
+                    : (zh ? '不自动授权 — 用户需手动申请' : 'No auto-grant — users must apply')}
+                </p>
+              ) : (
+                <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-2 max-h-36 overflow-y-auto space-y-1">
+                  {allModems.map(m => {
+                    const checked = (form.allowed_modem_ids as number[]).includes(m.id)
+                    return (
+                      <label key={m.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-700/40 rounded px-1 py-0.5">
+                        <input type="checkbox" checked={checked} onChange={() => {
+                          const cur = form.allowed_modem_ids as number[]
+                          set('allowed_modem_ids', checked ? cur.filter(id => id !== m.id) : [...cur, m.id])
+                        }} className="rounded" />
+                        <span className="text-xs text-gray-300">{m.alias || m.operator || m.phone_number || `#${m.id}`}</span>
+                        {m.operator && m.alias && <span className="text-[10px] text-gray-500">{m.operator}</span>}
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {err && <p className="text-red-400 text-xs">{err}</p>}
         </div>
