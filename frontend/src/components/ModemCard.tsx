@@ -41,9 +41,9 @@ export default function ModemCard({ modem, onClick }: Props) {
   return (
     <div
       onClick={onClick}
-      className="relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all duration-300 hover:-translate-y-1 group"
+      className="card-surface relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all duration-300 hover:-translate-y-1 group"
       style={{
-        background: 'rgba(13,27,48,0.75)',
+        background: 'var(--card-bg)',
         backdropFilter: 'blur(20px)',
         border: `1px solid ${cfg.glow}`,
         boxShadow: `0 0 20px ${cfg.glow}, inset 0 1px 0 rgba(255,255,255,0.04)`,

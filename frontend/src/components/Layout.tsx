@@ -340,9 +340,9 @@ export default function Layout() {
       isActive ? 'nav-active' : 'text-gray-400 hover:text-blue-200 hover:bg-blue-500/10')
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#020c1b' }}>
-      {/* Ambient background orbs */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden>
+    <div className="layout-root min-h-screen flex flex-col">
+      {/* Ambient background orbs — hidden in light theme via CSS */}
+      <div className="layout-orbs fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden>
         <div className="animate-orb absolute w-[600px] h-[600px] rounded-full opacity-30"
           style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.35) 0%, transparent 70%)', top: '-150px', left: '-100px' }} />
         <div className="animate-orb-2 absolute w-[500px] h-[500px] rounded-full opacity-20"

@@ -46,9 +46,9 @@ export default function Dashboard() {
           const Icon = s.icon
           return (
             <div key={s.label}
-              className="relative overflow-hidden rounded-2xl p-5 transition-all duration-300 hover:-translate-y-0.5"
+              className="stat-card card-surface relative overflow-hidden rounded-2xl p-5 transition-all duration-300 hover:-translate-y-0.5"
               style={{
-                background: 'rgba(13,27,48,0.7)',
+                background: 'var(--card-bg)',
                 backdropFilter: 'blur(20px)',
                 border: `1px solid ${s.border}`,
                 boxShadow: `0 0 32px ${s.glow}, inset 0 1px 0 rgba(255,255,255,0.04)`,
@@ -57,7 +57,7 @@ export default function Dashboard() {
               <div className="absolute inset-0 animate-shimmer pointer-events-none" />
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs text-blue-200/50 uppercase tracking-wider">{s.label}</p>
+                  <p className="stat-label text-xs text-blue-200/50 uppercase tracking-wider">{s.label}</p>
                   <p className={`text-4xl font-bold mt-2 ${s.color}`}
                     style={{ textShadow: `0 0 20px ${s.glow}` }}>
                     {s.value}

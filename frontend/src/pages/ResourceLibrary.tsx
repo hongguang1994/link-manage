@@ -212,27 +212,27 @@ export default function ResourceLibrary() {
 
             return (
               <div key={m.id}
-                className="relative overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5 group"
+                className="sim-card relative overflow-hidden rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5 group"
                 style={{
                   background: 'rgba(13,27,48,0.75)',
                   backdropFilter: 'blur(20px)',
                   border: `1px solid ${effectiveStatus === 'use' ? 'rgba(52,211,153,0.2)' : effectiveStatus === 'pending' ? 'rgba(251,191,36,0.15)' : 'rgba(59,130,246,0.12)'}`,
                   boxShadow: effectiveStatus === 'use' ? '0 0 20px rgba(52,211,153,0.1)' : '0 0 20px rgba(59,130,246,0.06)',
                 }}>
-                {/* top glow line */}
-                <div className="absolute top-0 left-4 right-4 h-px opacity-40"
+                {/* top glow line — hidden in light theme via .sim-card-glow */}
+                <div className="sim-card-glow absolute top-0 left-4 right-4 h-px opacity-40"
                   style={{ background: `linear-gradient(90deg,transparent,${modemCfg.dot},transparent)` }} />
 
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-white truncate group-hover:text-blue-200 transition-colors">
+                    <h3 className="sim-card-name font-semibold text-white truncate group-hover:text-blue-200 transition-colors">
                       {m.alias || `SIM ${m.id}`}
                     </h3>
-                    <p className="text-xs text-blue-200/30 mt-0.5 truncate">{m.operator || '未知运营商'}</p>
+                    <p className="sim-card-sub text-xs text-blue-200/30 mt-0.5 truncate">{m.operator || '未知运营商'}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-                    <Icon className={`w-4 h-4 ${modemCfg.color}`} style={{ filter: `drop-shadow(0 0 4px ${modemCfg.dot})` }} />
+                    <Icon className={`w-4 h-4 ${modemCfg.color}`} />
                     <span className="text-[10px]" style={{ color: modemCfg.dot }}>{modemCfg.label}</span>
                   </div>
                 </div>
@@ -240,17 +240,17 @@ export default function ResourceLibrary() {
                 {/* Info */}
                 <div className="space-y-1.5 text-xs mb-3">
                   <div className="flex justify-between">
-                    <span className="text-blue-200/40">号码</span>
-                    <span className="text-blue-100/70">{m.phone_number || '—'}</span>
+                    <span className="sim-card-label text-blue-200/40">号码</span>
+                    <span className="sim-card-value text-blue-100/70">{m.phone_number || '—'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-blue-200/40">信号</span>
+                    <span className="sim-card-label text-blue-200/40">信号</span>
                     <div className="flex items-end gap-0.5 h-3">
                       {[1,2,3,4,5].map(i => {
                         const bars = Math.round((m.signal_quality / 100) * 5)
                         const colors = ['#f87171','#fb923c','#facc15','#4ade80','#34d399']
                         return <div key={i} className="w-1 rounded-sm"
-                          style={{ height: `${i * 20}%`, background: i <= bars ? (colors[bars-1] ?? '#34d399') : 'rgba(255,255,255,0.08)' }} />
+                          style={{ height: `${i * 20}%`, background: i <= bars ? (colors[bars-1] ?? '#34d399') : 'var(--card-signal-empty)' }} />
                       })}
                     </div>
                   </div>
@@ -261,23 +261,23 @@ export default function ResourceLibrary() {
                   <span className={clsx('text-[11px] px-2 py-0.5 rounded-full', badge.cls)}>{badge.label}</span>
                   {canApply && (
                     <button onClick={() => setApplyTarget(m)}
-                      className="text-xs px-3 py-1 rounded-lg text-blue-300 transition-all hover:text-white"
+                      className="sim-apply-btn text-xs px-3 py-1 rounded-lg text-blue-300 transition-all hover:text-white"
                       style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)' }}>
                       申请权限
                     </button>
                   )}
                   {effectiveStatus === 'pending' && (
-                    <span className="flex items-center gap-1 text-xs text-amber-400/70">
+                    <span className="sim-status-wait flex items-center gap-1 text-xs text-amber-400/70">
                       <Clock className="w-3 h-3" /> 等待审批
                     </span>
                   )}
                   {(effectiveStatus === 'use' || effectiveStatus === 'view') && (
-                    <span className="flex items-center gap-1 text-xs text-emerald-400/70">
+                    <span className="sim-status-ok flex items-center gap-1 text-xs text-emerald-400/70">
                       <CheckCircle className="w-3 h-3" /> 可使用
                     </span>
                   )}
                   {isAdmin && (
-                    <span className="flex items-center gap-1 text-xs text-blue-400/60">
+                    <span className="sim-status-admin flex items-center gap-1 text-xs text-blue-400/60">
                       <Lock className="w-3 h-3" /> 管理员
                     </span>
                   )}

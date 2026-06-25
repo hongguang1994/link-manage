@@ -7,9 +7,9 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from jose import JWTError, jwt
 from app.core.database import SessionLocal
-from app.core.security import SECRET_KEY, ALGORITHM
+from app.core.security import SECRET_KEY, ALGORITHM, get_user_modem_grants, _perm
 from app.models.modem import Modem
-from app.models.user import User
+from app.models.user import User, UserRole
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -31,6 +31,12 @@ async def modem_status_ws(websocket: WebSocket, token: str = ""):
             if not user:
                 await websocket.close(code=4001)
                 return
+            is_admin = user.role == UserRole.ADMIN
+            # Pre-compute visible modem IDs for non-admin users
+            if not is_admin:
+                visible_ids = set(get_user_modem_grants(user.id, db, user=user))
+            else:
+                visible_ids = None  # None = all
         finally:
             db.close()
     except JWTError:
@@ -43,7 +49,10 @@ async def modem_status_ws(websocket: WebSocket, token: str = ""):
         while True:
             db = SessionLocal()
             try:
-                modems = db.query(Modem).all()
+                q = db.query(Modem)
+                if visible_ids is not None:
+                    q = q.filter(Modem.id.in_(visible_ids))
+                modems = q.all()
                 data = [
                     {
                         "id": m.id,
