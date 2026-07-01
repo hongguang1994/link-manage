@@ -1,0 +1,156 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+
+	"simnexus-go/database"
+	"simnexus-go/models"
+
+	"github.com/gin-gonic/gin"
+)
+
+type roleBody struct {
+	Name               string  `json:"name"`
+	Description        string  `json:"description"`
+	CanViewSim         *bool   `json:"can_view_sim"`
+	CanApproveRequests *bool   `json:"can_approve_requests"`
+	CanViewHistory     *bool   `json:"can_view_history"`
+	ReadOnly           *bool   `json:"read_only"`
+	CanSupport         *bool   `json:"can_support"`
+	AllowedModemIDs    *[]uint `json:"allowed_modem_ids"`
+	// track presence of allowed_modem_ids key
+	rawHasScope bool
+}
+
+// ListRoles returns all roles (admin).
+func ListRoles(c *gin.Context) {
+	var roles []models.Role
+	database.DB.Preload("ModemScope").Order("id").Find(&roles)
+	out := make([]map[string]interface{}, 0, len(roles))
+	for _, r := range roles {
+		out = append(out, models.RoleOut(r))
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func applyModemScope(role *models.Role, ids *[]uint) {
+	if ids == nil || len(*ids) == 0 {
+		database.DB.Model(role).Association("ModemScope").Clear()
+		role.ModemScope = nil
+		return
+	}
+	var modems []models.Modem
+	database.DB.Where("id IN ?", *ids).Find(&modems)
+	database.DB.Model(role).Association("ModemScope").Replace(modems)
+	role.ModemScope = modems
+}
+
+// CreateRole creates a role (admin).
+func CreateRole(c *gin.Context) {
+	var raw map[string]interface{}
+	c.ShouldBindJSON(&raw)
+	var body roleBody
+	remarshal(raw, &body)
+
+	var existing models.Role
+	if database.DB.Where("name = ?", body.Name).First(&existing).Error == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"detail": "角色名称已存在"})
+		return
+	}
+	role := models.Role{
+		Name:               body.Name,
+		Description:        body.Description,
+		CanViewSim:         derefBool(body.CanViewSim),
+		CanApproveRequests: derefBool(body.CanApproveRequests),
+		CanViewHistory:     derefBool(body.CanViewHistory),
+		ReadOnly:           derefBool(body.ReadOnly),
+		CanSupport:         derefBool(body.CanSupport),
+	}
+	database.DB.Create(&role)
+	applyModemScope(&role, body.AllowedModemIDs)
+	c.JSON(http.StatusOK, models.RoleOut(role))
+}
+
+// UpdateRole patches a role (admin).
+func UpdateRole(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var role models.Role
+	if database.DB.Preload("ModemScope").First(&role, id).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"detail": "角色不存在"})
+		return
+	}
+	var raw map[string]interface{}
+	c.ShouldBindJSON(&raw)
+	var body roleBody
+	remarshal(raw, &body)
+
+	if body.Name != "" {
+		role.Name = body.Name
+	}
+	if _, ok := raw["description"]; ok {
+		role.Description = body.Description
+	}
+	if body.CanViewSim != nil {
+		role.CanViewSim = *body.CanViewSim
+	}
+	if body.CanApproveRequests != nil {
+		role.CanApproveRequests = *body.CanApproveRequests
+	}
+	if body.CanViewHistory != nil {
+		role.CanViewHistory = *body.CanViewHistory
+	}
+	if body.ReadOnly != nil {
+		role.ReadOnly = *body.ReadOnly
+	}
+	if body.CanSupport != nil {
+		role.CanSupport = *body.CanSupport
+	}
+	database.DB.Save(&role)
+	if _, ok := raw["allowed_modem_ids"]; ok {
+		applyModemScope(&role, body.AllowedModemIDs)
+	}
+	c.JSON(http.StatusOK, models.RoleOut(role))
+}
+
+// DeleteRole removes a non-system role (admin).
+func DeleteRole(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var role models.Role
+	if database.DB.First(&role, id).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"detail": "角色不存在"})
+		return
+	}
+	if role.IsSystem {
+		c.JSON(http.StatusBadRequest, gin.H{"detail": "系统预置角色不可删除"})
+		return
+	}
+	database.DB.Delete(&role)
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+type setRolesBody struct {
+	RoleIDs []uint `json:"role_ids"`
+}
+
+// SetUserRoles replaces a user's RBAC roles (admin).
+func SetUserRoles(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	var user models.User
+	if database.DB.First(&user, id).Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"detail": "用户不存在"})
+		return
+	}
+	var body setRolesBody
+	c.ShouldBindJSON(&body)
+	var roles []models.Role
+	if len(body.RoleIDs) > 0 {
+		database.DB.Where("id IN ?", body.RoleIDs).Find(&roles)
+	}
+	database.DB.Model(&user).Association("RbacRoles").Replace(roles)
+	ids := make([]uint, 0, len(roles))
+	for _, r := range roles {
+		ids = append(ids, r.ID)
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "user_id": id, "role_ids": ids})
+}

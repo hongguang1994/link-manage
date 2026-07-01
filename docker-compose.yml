@@ -2,10 +2,12 @@ version: '3.9'
 
 services:
   backend:
-    build: ./backend
+    build: ./backend-go
     restart: unless-stopped
     volumes:
       - ./data:/app/data
+      # 上传文件持久化
+      - ./uploads:/opt/simnexus/uploads
       # 挂载宿主机 D-Bus socket，使容器内 mmcli 可访问宿主机 ModemManager
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
       - /dev/bus/usb:/dev/bus/usb
