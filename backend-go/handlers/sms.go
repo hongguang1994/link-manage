@@ -15,16 +15,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// userVisibleModemIDs returns (ids, unrestricted). unrestricted=true for admin.
+// userVisibleModemIDs 返回当前用户可查看的设备 ID 列表（不限权限级别）。
+// unrestricted=true 表示管理员，可见所有设备。
 func userVisibleModemIDs(u *models.User) ([]uint, bool) {
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		return nil, true
 	}
 	return security.GetUserModemGrants(database.DB, u.ID, "", u), false
 }
 
+// requireUseGrant 检查用户是否对指定设备拥有 use 级别权限（可发送短信）。
 func requireUseGrant(u *models.User, modemID uint) bool {
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		return true
 	}
 	useIDs := security.GetUserModemGrants(database.DB, u.ID, models.LevelUse, u)
@@ -92,7 +94,7 @@ func SendSMS(c *gin.Context) {
 	if !success {
 		label := modemDisplayLabel(&modem)
 		body := "发往 " + req.PhoneNumber + " 的短信发送失败：" + message
-		if me.Role == models.RoleAdmin {
+		if me.IsAdmin() {
 			services.Push("sms_failed", "短信发送失败", "["+label+"] "+body, "admin", nil)
 		} else {
 			services.Push("sms_failed", "短信发送失败", "["+label+"] "+body, "user", &me.ID)
@@ -103,6 +105,7 @@ func SendSMS(c *gin.Context) {
 	c.JSON(http.StatusOK, sms)
 }
 
+// modemDisplayLabel 返回设备展示名称，优先级：别名 > 型号 > 设备#ID。
 func modemDisplayLabel(m *models.Modem) string {
 	if m.Alias != "" {
 		return m.Alias
@@ -138,6 +141,7 @@ func ListMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, msgs)
 }
 
+// deleteFromModem 将收件短信从物理设备上删除（避免设备存储满），仅处理收件方向。
 func deleteFromModem(msg *models.SmsMessage) {
 	if msg.Direction != models.SmsInbound || msg.MmSmsIndex == "" {
 		return
@@ -228,6 +232,7 @@ func DeleteTemplate(c *gin.Context) {
 
 // Scheduled tasks
 
+// taskToOut 将任务记录转为 API 响应，附加创建者用户名。
 func taskToOut(t *models.SmsScheduledTask) gin.H {
 	out := gin.H{}
 	remarshal(t, &out)
@@ -244,7 +249,7 @@ func taskToOut(t *models.SmsScheduledTask) gin.H {
 func ListTasks(c *gin.Context) {
 	me := middleware.CurrentUser(c)
 	q := database.DB.Model(&models.SmsScheduledTask{})
-	if me.Role != models.RoleAdmin {
+	if !me.IsAdmin() {
 		ids, unrestricted := userVisibleModemIDs(me)
 		if !unrestricted {
 			q = q.Where("modem_id IN ?", ids)
@@ -325,7 +330,7 @@ func UpdateTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"detail": "Task not found"})
 		return
 	}
-	if me.Role != models.RoleAdmin && (task.CreatedByID == nil || *task.CreatedByID != me.ID) {
+	if !me.IsAdmin() && (task.CreatedByID == nil || *task.CreatedByID != me.ID) {
 		c.JSON(http.StatusForbidden, gin.H{"detail": "无权修改此任务"})
 		return
 	}
@@ -366,7 +371,7 @@ func DeleteTask(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"detail": "Task not found"})
 		return
 	}
-	if me.Role != models.RoleAdmin && (task.CreatedByID == nil || *task.CreatedByID != me.ID) {
+	if !me.IsAdmin() && (task.CreatedByID == nil || *task.CreatedByID != me.ID) {
 		c.JSON(http.StatusForbidden, gin.H{"detail": "无权删除此任务"})
 		return
 	}
@@ -391,7 +396,7 @@ func RunTaskNow(c *gin.Context) {
 func AdminListTasks(c *gin.Context) {
 	me := middleware.CurrentUser(c)
 	q := database.DB.Model(&models.SmsScheduledTask{})
-	if me.Role != models.RoleAdmin {
+	if !me.IsAdmin() {
 		q = q.Where("created_by_id = ?", me.ID)
 	} else if uid := c.Query("user_id"); uid != "" {
 		q = q.Where("created_by_id = ?", uid)
@@ -412,7 +417,7 @@ func AdminListTasks(c *gin.Context) {
 func AdminTaskStats(c *gin.Context) {
 	me := middleware.CurrentUser(c)
 	q := database.DB.Model(&models.SmsScheduledTask{})
-	if me.Role != models.RoleAdmin {
+	if !me.IsAdmin() {
 		q = q.Where("created_by_id = ?", me.ID)
 	}
 	var tasks []models.SmsScheduledTask
@@ -442,7 +447,7 @@ func AdminTaskHistory(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"detail": "任务不存在"})
 		return
 	}
-	if me.Role != models.RoleAdmin && (task.CreatedByID == nil || *task.CreatedByID != me.ID) {
+	if !me.IsAdmin() && (task.CreatedByID == nil || *task.CreatedByID != me.ID) {
 		c.JSON(http.StatusForbidden, gin.H{"detail": "无权查看该任务"})
 		return
 	}

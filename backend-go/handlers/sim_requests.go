@@ -13,9 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// approverModemScope returns (ids, unrestricted). unrestricted=true means all.
+// approverModemScope 返回审批员可管理的设备 ID 集合。
+// unrestricted=true 表示无限制（管理员或 ModemScope 为空的审批角色）。
 func approverModemScope(u *models.User) ([]uint, bool) {
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		return nil, true
 	}
 	var approverRoles []models.Role
@@ -43,6 +44,7 @@ func approverModemScope(u *models.User) ([]uint, bool) {
 	return ids, false
 }
 
+// inScope 判断给定设备是否在审批员的管辖范围内。
 func inScope(ids []uint, unrestricted bool, modemID uint) bool {
 	if unrestricted {
 		return true
@@ -55,6 +57,7 @@ func inScope(ids []uint, unrestricted bool, modemID uint) bool {
 	return false
 }
 
+// fmtRequest 将申请记录格式化为 API 响应，包含用户名、设备名、授权状态和是否过期。
 func fmtRequest(r *models.SimAccessRequest, grants map[[2]uint]*models.SimGrant) gin.H {
 	now := time.Now()
 	var username, modemName string
@@ -97,6 +100,7 @@ func fmtRequest(r *models.SimAccessRequest, grants map[[2]uint]*models.SimGrant)
 	}
 }
 
+// upsertGrant 创建或更新 (userID, modemID) 的授权记录，已有记录则原地更新。
 func upsertGrant(userID, modemID uint, level string, expiresAt *time.Time, grantedByID uint, requestID *uint) {
 	now := time.Now()
 	var existing models.SimGrant
@@ -119,6 +123,7 @@ func upsertGrant(userID, modemID uint, level string, expiresAt *time.Time, grant
 	}
 }
 
+// modemName 返回设备的展示名称（别名优先，否则为 "SIM <id>"）。
 func modemName(modemID uint) string {
 	var modem models.Modem
 	if database.DB.First(&modem, modemID).Error == nil && modem.Alias != "" {
@@ -420,6 +425,7 @@ func RevokeGrant(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+// setNote 将审批备注写入申请记录，空字符串时置 nil。
 func setNote(r *models.SimAccessRequest, note string) {
 	if note == "" {
 		r.AdminNote = nil
@@ -428,6 +434,7 @@ func setNote(r *models.SimAccessRequest, note string) {
 	}
 }
 
+// notifyApproved 向用户推送申请批准通知，包含权限级别和有效期信息。
 func notifyApproved(userID, modemID uint, level string, expiresAt *time.Time) {
 	levelLabel := "使用权限"
 	if level == models.LevelView {
@@ -441,6 +448,7 @@ func notifyApproved(userID, modemID uint, level string, expiresAt *time.Time) {
 		"你对 "+modemName(modemID)+" 的申请已获批准"+levelLabel+expStr, "user", &userID)
 }
 
+// keys 将 map[uint]bool 的所有键提取为 slice。
 func keys(m map[uint]bool) []uint {
 	out := make([]uint, 0, len(m))
 	for k := range m {

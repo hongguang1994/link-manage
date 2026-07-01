@@ -31,7 +31,7 @@ func ModemStatusWS(c *gin.Context) {
 	}
 
 	var visibleIDs []uint
-	unrestricted := user.Role == models.RoleAdmin
+	unrestricted := user.IsAdmin()
 	if !unrestricted {
 		visibleIDs = security.GetUserModemGrants(database.DB, user.ID, "", user)
 	}

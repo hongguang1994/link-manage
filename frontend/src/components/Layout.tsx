@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Send, Clock, MessageSquare, Cpu, CreditCard,
   Users, LogOut, Sun, Moon, Monitor, ChevronDown, User, KeyRound, X, ShieldCheck,
   Wifi, RefreshCw, ArrowUp, MessageCircle, PanelLeftClose, PanelLeftOpen,
-  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText, ClipboardCheck, Database, Bot,
+  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText, ClipboardCheck, Database, Bot, ScrollText,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useModemStore } from '../store/modemStore'
@@ -664,7 +664,7 @@ export default function Layout() {
             {user?.role === 'admin' && (
               <NavGroup
                 label={t('layout_group_admin')}
-                routes={['/users', '/roles', '/admin/telegram']}
+                routes={['/users', '/roles', '/admin/telegram', '/admin/logs']}
                 sideCollapsed={sideCollapsed}
               >
                 <NavLink to="/users" className={navLinkCls} title={sideCollapsed ? t('nav_users') : undefined}>
@@ -678,6 +678,10 @@ export default function Layout() {
                 <NavLink to="/admin/telegram" className={navLinkCls} title={sideCollapsed ? 'Telegram' : undefined}>
                   <Bot className="w-4 h-4 shrink-0" />
                   {!sideCollapsed && <span>Telegram</span>}
+                </NavLink>
+                <NavLink to="/admin/logs" className={navLinkCls} title={sideCollapsed ? t('nav_logs') : undefined}>
+                  <ScrollText className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && <span>{t('nav_logs')}</span>}
                 </NavLink>
               </NavGroup>
             )}

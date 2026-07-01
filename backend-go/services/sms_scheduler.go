@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	cronRunner *cron.Cron
-	jobIDs     = map[uint]cron.EntryID{} // task.ID -> cron entry
-	onceTimers = map[uint]*time.Timer{}  // task.ID -> one-shot timer
-	schedMu    sync.Mutex
+	cronRunner *cron.Cron                 // cron 调度器，使用 UTC 时区
+	jobIDs     = map[uint]cron.EntryID{}  // task.ID → cron entry ID，用于取消定期任务
+	onceTimers = map[uint]*time.Timer{}   // task.ID → time.Timer，用于取消一次性任务
+	schedMu    sync.Mutex                 // 保护 jobIDs 和 onceTimers 的并发访问
 )
 
 // StartScheduler launches the cron runner and the 60s reload loop.
@@ -81,6 +81,8 @@ func ScheduleTask(task models.SmsScheduledTask) {
 	scheduleLocked(task)
 }
 
+// scheduleLocked 在持有 schedMu 锁的情况下注册单个任务，需调用方加锁。
+// cron 任务注册到 cronRunner，一次性任务使用 time.AfterFunc。
 func scheduleLocked(task models.SmsScheduledTask) {
 	id := task.ID
 	if task.CronExpression != nil && strings.TrimSpace(*task.CronExpression) != "" {
@@ -196,7 +198,7 @@ func ExecuteTask(taskID uint) {
 		body := fmt.Sprintf("任务「%s」[%s] 有 %d/%d 条短信发送失败", task.Name, label, failCount, len(recipients))
 		if task.CreatedByID != nil {
 			var creator models.User
-			if db.First(&creator, *task.CreatedByID).Error == nil && creator.Role == models.RoleAdmin {
+			if db.First(&creator, *task.CreatedByID).Error == nil && creator.IsAdmin() {
 				Push("task_failed", "定时任务失败", body, "admin", nil)
 			} else {
 				Push("task_failed", "定时任务失败", body, "user", task.CreatedByID)

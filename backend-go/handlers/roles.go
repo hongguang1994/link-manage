@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// roleBody 创建/更新角色的请求体，布尔字段使用指针以区分"未传"与"传 false"。
 type roleBody struct {
 	Name               string  `json:"name"`
 	Description        string  `json:"description"`
@@ -18,8 +19,8 @@ type roleBody struct {
 	CanViewHistory     *bool   `json:"can_view_history"`
 	ReadOnly           *bool   `json:"read_only"`
 	CanSupport         *bool   `json:"can_support"`
-	AllowedModemIDs    *[]uint `json:"allowed_modem_ids"`
-	// track presence of allowed_modem_ids key
+	AllowedModemIDs    *[]uint `json:"allowed_modem_ids"` // nil=不修改，[]uint{}=清除限制
+	// rawHasScope 内部标记，记录请求体是否包含 allowed_modem_ids 字段。
 	rawHasScope bool
 }
 
@@ -34,6 +35,7 @@ func ListRoles(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
+// applyModemScope 替换角色的设备范围关联；ids=nil 或空时清除所有关联。
 func applyModemScope(role *models.Role, ids *[]uint) {
 	if ids == nil || len(*ids) == 0 {
 		database.DB.Model(role).Association("ModemScope").Clear()

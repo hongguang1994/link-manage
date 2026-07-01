@@ -108,7 +108,7 @@ func TelegramProxyFile(c *gin.Context) {
 		return
 	}
 	user, err := security.LoadUserByUsername(database.DB, username)
-	if err != nil || user.Role != models.RoleAdmin {
+	if err != nil || !user.IsAdmin() {
 		c.JSON(http.StatusForbidden, gin.H{"detail": "Forbidden"})
 		return
 	}

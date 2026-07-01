@@ -588,6 +588,16 @@ export const zh = {
   hist_copied: '已复制',
   hist_close: '关闭',
   hist_expand_title: '点击展开全文',
+
+  nav_logs: '系统日志',
+  logs_connected: '已连接',
+  logs_disconnected: '已断开',
+  logs_lines: '条',
+  logs_auto_scroll: '自动滚动',
+  logs_clear: '清屏',
+  logs_search: '搜索关键词...',
+  logs_empty: '暂无日志',
+  logs_connecting: '正在连接...',
 }
 
 export type TranslationKey = keyof typeof zh

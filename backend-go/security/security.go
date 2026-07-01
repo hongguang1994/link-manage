@@ -11,9 +11,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// accessTokenExpireMinutes JWT 令牌有效期（24 小时）。
 const accessTokenExpireMinutes = 60 * 24 // 24h
 
-// HashPassword returns a bcrypt hash of the password.
+// HashPassword 使用 bcrypt 对密码进行散列，返回可直接存储的字符串。
 func HashPassword(pw string) (string, error) {
 	b, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 	return string(b), err
@@ -67,22 +68,23 @@ func LoadUserByUsername(db *gorm.DB, username string) (*models.User, error) {
 	return &u, nil
 }
 
-// Perm mirrors Python _perm(): merged permission set from RBAC roles.
-// Returns nil if the (non-admin) user has no roles.
+// Permissions 是用户合并后的有效权限集，镜像 Python 的 _perm() 返回值。
+// AllowedModemIDs=nil 且 unrestricted=true 表示不限设备范围。
 type Permissions struct {
 	CanViewSim         bool
 	CanApproveRequests bool
 	CanViewHistory     bool
 	CanSupport         bool
 	ReadOnly           bool
-	// AllowedModemIDs: nil means unrestricted; otherwise the restricted set.
+	// AllowedModemIDs: nil 表示无限制；非 nil 为受限设备 ID 集合。
 	AllowedModemIDs []uint
-	unrestricted    bool // true when AllowedModemIDs is intentionally None
+	unrestricted    bool // 内部标记：true 时 AllowedModemIDs 语义上为 nil（无限制）
 }
 
-// Perm computes the merged permissions for a user. Admin returns full access.
+// Perm 计算用户的合并权限。管理员返回全权限；无 RBAC 角色的用户返回 nil。
+// 正向权限标志取所有角色的并集（any），ReadOnly 取交集（all）。
 func Perm(u *models.User) *Permissions {
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		return &Permissions{
 			CanViewSim: true, CanApproveRequests: true, CanViewHistory: true,
 			CanSupport: true, ReadOnly: false, unrestricted: true,
@@ -141,7 +143,7 @@ func (p *Permissions) IsUnrestrictedScope() bool { return p == nil || p.unrestri
 
 // IsSupportStaff reports whether the user is admin or has a can_support role.
 func IsSupportStaff(u *models.User) bool {
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		return true
 	}
 	for _, r := range u.RbacRoles {
@@ -152,8 +154,9 @@ func IsSupportStaff(u *models.User) bool {
 	return false
 }
 
-// GetUserModemGrants returns the modem IDs a user can access.
-// level = "" (any) or "use". Role auto-grants are computed from u.RbacRoles.
+// GetUserModemGrants 返回用户可访问的设备 ID 集合。
+// level="" 表示任意权限级别，level="use" 仅返回可发送短信的设备。
+// 审批员角色在其管辖范围内自动获得 use 级别授权（无需申请）。
 func GetUserModemGrants(db *gorm.DB, userID uint, level string, u *models.User) []uint {
 	now := time.Now().UTC()
 	q := db.Model(&models.SimGrant{}).
@@ -203,7 +206,7 @@ func GetUserModemGrants(db *gorm.DB, userID uint, level string, u *models.User) 
 	return out
 }
 
-// ContainsUint reports membership.
+// ContainsUint 判断 uint 切片中是否包含指定值。
 func ContainsUint(s []uint, v uint) bool {
 	for _, x := range s {
 		if x == v {

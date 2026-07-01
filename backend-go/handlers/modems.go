@@ -14,10 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// visibleModemIDs returns (ids, unrestricted, permitted).
-// unrestricted=true means admin/no filter. permitted=false means 403.
+// visibleModemIDs 返回当前用户可见的设备 ID 列表。
+// unrestricted=true 表示管理员或无范围限制；permitted=false 表示无权限（应返回 403）。
 func visibleModemIDs(u *models.User) ([]uint, bool, bool) {
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		return nil, true, true
 	}
 	p := security.Perm(u)
@@ -41,7 +41,7 @@ func visibleModemIDs(u *models.User) ([]uint, bool, bool) {
 // ListAvailableModems returns all active modems for browsing.
 func ListAvailableModems(c *gin.Context) {
 	u := middleware.CurrentUser(c)
-	if u.Role != models.RoleAdmin {
+	if !u.IsAdmin() {
 		p := security.Perm(u)
 		if p == nil || !p.CanViewSim {
 			c.JSON(http.StatusForbidden, gin.H{"detail": "无SIM卡查看权限"})
@@ -56,7 +56,7 @@ func ListAvailableModems(c *gin.Context) {
 // ListModems returns modems visible to the user.
 func ListModems(c *gin.Context) {
 	u := middleware.CurrentUser(c)
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		var modems []models.Modem
 		database.DB.Where("is_active = ?", true).Order("id").Find(&modems)
 		c.JSON(http.StatusOK, modems)
@@ -76,8 +76,9 @@ func ListModems(c *gin.Context) {
 	c.JSON(http.StatusOK, modems)
 }
 
+// canAccessModem 检查用户是否有权访问指定设备（任意权限级别）。
 func canAccessModem(u *models.User, modemID uint) bool {
-	if u.Role == models.RoleAdmin {
+	if u.IsAdmin() {
 		return true
 	}
 	ids, _, ok := visibleModemIDs(u)
@@ -91,7 +92,7 @@ func canAccessModem(u *models.User, modemID uint) bool {
 func GetModem(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	u := middleware.CurrentUser(c)
-	if u.Role != models.RoleAdmin && !canAccessModem(u, uint(id)) {
+	if !u.IsAdmin() && !canAccessModem(u, uint(id)) {
 		c.JSON(http.StatusForbidden, gin.H{"detail": "无权访问该设备"})
 		return
 	}
@@ -103,6 +104,7 @@ func GetModem(c *gin.Context) {
 	c.JSON(http.StatusOK, modem)
 }
 
+// modemUpdate 调制解调器可编辑字段（目前仅支持修改别名）。
 type modemUpdate struct {
 	Alias *string `json:"alias"`
 }
@@ -128,7 +130,7 @@ func UpdateModem(c *gin.Context) {
 func GetModemDetail(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	u := middleware.CurrentUser(c)
-	if u.Role != models.RoleAdmin && !canAccessModem(u, uint(id)) {
+	if !u.IsAdmin() && !canAccessModem(u, uint(id)) {
 		c.JSON(http.StatusForbidden, gin.H{"detail": "无权访问该设备"})
 		return
 	}

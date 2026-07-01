@@ -8,27 +8,28 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Config holds runtime configuration loaded from environment / .env.
+// Config 保存从环境变量 / .env 文件加载的运行时配置。
 type Config struct {
-	AppName          string
-	DatabaseURL      string
-	SecretKey        string
-	ModemPollSeconds int
-	CorsOrigins      []string
-	TelegramBotToken string
-	TelegramChatID   string
-	UploadDir        string
+	AppName          string   // 应用名称
+	DatabaseURL      string   // SQLAlchemy 风格的数据库 URL
+	SecretKey        string   // JWT 签名密钥，生产环境必须修改
+	ModemPollSeconds int      // 调制解调器轮询间隔（秒）
+	CorsOrigins      []string // 允许的 CORS 来源列表
+	TelegramBotToken string   // Telegram Bot Token
+	TelegramChatID   string   // Telegram 推送目标 Chat ID
+	UploadDir        string   // 文件上传存储目录
 }
 
-// C is the global config instance.
+// C 是全局配置单例，由 Load() 初始化后可在任意包中访问。
 var C *Config
 
-// SecretKey / Algorithm mirror the Python security module constants.
+// SecretKey 与 Algorithm 镜像 Python 安全模块的常量，供 JWT 签名使用。
 var SecretKey string
 
+// Algorithm 指定 JWT 签名算法（HS256）。
 const Algorithm = "HS256"
 
-// Load reads configuration from .env (if present) and environment variables.
+// Load 从 .env（如存在）和环境变量读取配置，并将结果写入全局 C。
 func Load() *Config {
 	_ = godotenv.Load(".env")
 
@@ -55,7 +56,7 @@ func Load() *Config {
 	return cfg
 }
 
-// SQLitePath converts a SQLAlchemy-style URL to a plain file path.
+// SQLitePath 将 SQLAlchemy 风格的 URL（如 sqlite:///./foo.db）转换为纯文件路径。
 func (c *Config) SQLitePath() string {
 	u := c.DatabaseURL
 	u = strings.TrimPrefix(u, "sqlite:///")
@@ -66,6 +67,7 @@ func (c *Config) SQLitePath() string {
 	return u
 }
 
+// getenv 读取环境变量，若未设置则返回默认值。
 func getenv(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -73,6 +75,7 @@ func getenv(key, def string) string {
 	return def
 }
 
+// getenvInt 读取整数类型的环境变量，解析失败时返回默认值。
 func getenvInt(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {

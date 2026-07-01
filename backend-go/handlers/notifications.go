@@ -13,12 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
-// visibleNotificationFilter applies audience filtering for the user.
+// visibleNotificationFilter 对通知查询追加按 audience 过滤的 WHERE 条件，
+// 规则：all 对所有人可见；user 仅对 target_user_id 可见；admin/support 按角色可见。
 func visibleNotificationFilter(me *models.User, q *gorm.DB) *gorm.DB {
 	// base: 'all' OR ('user' AND target=me)
 	cond := "audience = 'all' OR (audience = 'user' AND target_user_id = ?)"
 	args := []interface{}{me.ID}
-	if me.Role == models.RoleAdmin {
+	if me.IsAdmin() {
 		cond += " OR audience = 'admin' OR audience = 'support'"
 	} else if security.IsSupportStaff(me) {
 		cond += " OR audience = 'support'"

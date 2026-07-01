@@ -11,9 +11,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// userCtxKey 是存放当前用户的 Gin Context key。
 const userCtxKey = "currentUser"
 
-// CurrentUser extracts the authenticated user placed by AuthRequired.
+// CurrentUser 从 Gin Context 中取出 AuthRequired 注入的当前用户，未认证时返回 nil。
 func CurrentUser(c *gin.Context) *models.User {
 	v, ok := c.Get(userCtxKey)
 	if !ok {
@@ -23,6 +24,7 @@ func CurrentUser(c *gin.Context) *models.User {
 	return u
 }
 
+// extractToken 从 Authorization 头（Bearer）或 ?token= 查询参数中提取 JWT。
 func extractToken(c *gin.Context) string {
 	auth := c.GetHeader("Authorization")
 	if strings.HasPrefix(auth, "Bearer ") {
@@ -58,7 +60,7 @@ func AuthRequired() gin.HandlerFunc {
 func RequireAdmin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		u := CurrentUser(c)
-		if u == nil || u.Role != models.RoleAdmin {
+		if u == nil || !u.IsAdmin() {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"detail": "需要管理员权限"})
 			return
 		}
@@ -70,7 +72,7 @@ func RequireAdmin() gin.HandlerFunc {
 func RequireApproveRequests() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		u := CurrentUser(c)
-		if u != nil && u.Role == models.RoleAdmin {
+		if u != nil && u.IsAdmin() {
 			c.Next()
 			return
 		}
@@ -87,7 +89,7 @@ func RequireApproveRequests() gin.HandlerFunc {
 func RequireViewHistory() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		u := CurrentUser(c)
-		if u != nil && u.Role == models.RoleAdmin {
+		if u != nil && u.IsAdmin() {
 			c.Next()
 			return
 		}

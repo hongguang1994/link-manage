@@ -590,4 +590,14 @@ export const en: Record<TranslationKey, string> = {
   hist_copied: 'Copied',
   hist_close: 'Close',
   hist_expand_title: 'Click to expand',
+
+  nav_logs: 'System Logs',
+  logs_connected: 'Connected',
+  logs_disconnected: 'Disconnected',
+  logs_lines: 'lines',
+  logs_auto_scroll: 'Auto scroll',
+  logs_clear: 'Clear',
+  logs_search: 'Search...',
+  logs_empty: 'No logs yet',
+  logs_connecting: 'Connecting...',
 }

@@ -19,11 +19,12 @@ import (
 	"simnexus-go/models"
 )
 
+// telegramAPIBase Telegram Bot API 基础 URL。
 const telegramAPIBase = "https://api.telegram.org"
 
 var (
-	tgLastUpdateID int64
-	tgReModemArg   = regexp.MustCompile(`^#(\d+)`)
+	tgLastUpdateID int64                                     // 长轮询 offset，避免重复处理同一消息
+	tgReModemArg   = regexp.MustCompile(`^#(\d+)`)          // 匹配 /send #<id> 中的设备 ID
 )
 
 func tgToken() string  { return config.C.TelegramBotToken }
@@ -65,6 +66,7 @@ func TelegramPushInboundSMS(modemLabel, sender, content string) bool {
 	return TelegramSendMessage(text, "", true)
 }
 
+// tgLog 将 Telegram 消息持久化到数据库，供前端展示会话记录。
 func tgLog(chatID, username, direction, text string, isCmd bool, fileID, fileType string) {
 	var up *string
 	if username != "" {
@@ -83,6 +85,7 @@ func tgLog(chatID, username, direction, text string, isCmd bool, fileID, fileTyp
 	})
 }
 
+// modemLabel 返回设备展示名称，用于 Bot 消息中的设备标识。
 func modemLabel(m *models.Modem) string {
 	if m.Alias != "" {
 		return m.Alias
@@ -93,6 +96,8 @@ func modemLabel(m *models.Modem) string {
 	return fmt.Sprintf("设备#%d", m.ID)
 }
 
+// tgDoSend 通过指定设备发送短信，并将结果回复到 Telegram。
+// ZTE 设备走 HTTP 驱动，其余走 mmcli。
 func tgDoSend(m *models.Modem, number, content, chatID string) {
 	obj := m.MmObjectPath
 	var success bool
@@ -135,6 +140,7 @@ type tgMessage struct {
 	Voice    map[string]interface{} `json:"voice"`
 }
 
+// tgUsername 从 Telegram 消息的 from 字段提取用户名或姓名。
 func tgUsername(from map[string]interface{}) string {
 	if from == nil {
 		return ""
@@ -148,6 +154,8 @@ func tgUsername(from map[string]interface{}) string {
 	return ""
 }
 
+// tgHandle 处理收到的 Telegram 消息：分发媒体类消息入库，解析文字命令执行操作。
+// 支持命令：/modems /send /list /help。
 func tgHandle(msg *tgMessage) {
 	chatID := strconv.FormatInt(msg.Chat.ID, 10)
 	text := strings.TrimSpace(firstNonEmpty(msg.Text, msg.Caption))
@@ -289,6 +297,7 @@ func tgHandle(msg *tgMessage) {
 	}
 }
 
+// mapFileID 从媒体对象（document/video/sticker/voice）中提取 file_id。
 func mapFileID(m map[string]interface{}) string {
 	if m == nil {
 		return ""
@@ -299,6 +308,7 @@ func mapFileID(m map[string]interface{}) string {
 	return ""
 }
 
+// orDefault 若 s 为空则返回 def，用于媒体消息的展示文本兜底。
 func orDefault(s, def string) string {
 	if s == "" {
 		return def

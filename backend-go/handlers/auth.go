@@ -11,13 +11,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// loginRequest 登录请求体，captcha_token/captcha_code 可选（均传或均不传）。
 type loginRequest struct {
 	Username     string `json:"username"`
 	Password     string `json:"password"`
-	CaptchaToken string `json:"captcha_token"`
-	CaptchaCode  string `json:"captcha_code"`
+	CaptchaToken string `json:"captcha_token"` // 验证码 JWT（与 captcha_code 配对）
+	CaptchaCode  string `json:"captcha_code"`  // 用户输入的验证码答案
 }
 
+// userOut 将 User 模型转为 API 响应 map，包含 rbac_roles 列表。
 func userOut(u *models.User) gin.H {
 	roles := make([]map[string]interface{}, 0, len(u.RbacRoles))
 	for _, r := range u.RbacRoles {

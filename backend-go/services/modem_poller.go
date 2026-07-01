@@ -12,6 +12,7 @@ import (
 	"simnexus-go/models"
 )
 
+// prevStatus 记录每个设备上次轮询时的状态，用于检测上下线转变并推送通知。
 var prevStatus = map[string]string{}
 
 // StartPolling runs the modem poll loop until ctx is cancelled.
@@ -34,6 +35,8 @@ func StartPolling(ctx context.Context) {
 	}
 }
 
+// poll 执行一次完整的设备扫描：同步 mmcli 和 ZTE 设备状态、入库收件短信、
+// 检测状态变化推送通知，并将不再存在的设备标记为离线。
 func poll() {
 	detected := ListModems()
 	if zte := ZteGetModemInfo(); zte != nil {
@@ -171,6 +174,8 @@ func poll() {
 	}
 }
 
+// ingestInbox 将收件短信列表入库，按 (modem_id, mm_sms_index) 去重，
+// 新收件同时触发 Telegram 推送。
 func ingestInbox(modem *models.Modem, messages []InboxMessage) {
 	db := database.DB
 	for _, msg := range messages {

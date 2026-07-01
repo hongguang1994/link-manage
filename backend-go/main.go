@@ -14,20 +14,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// main 是程序入口：初始化日志缓冲、配置、数据库，启动后台服务，注册路由，监听 :8000。
 func main() {
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	// 初始化双写日志：同时输出到 stdout 和内存缓冲区（供 SSE 日志流使用）
+	inner := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	slog.SetDefault(slog.New(services.NewBufferedHandler(inner)))
 
 	cfg := config.Load()
 	database.Init(cfg)
 
-	// Background services
+	// 启动后台服务：短信调度器、设备轮询、Telegram Bot 长轮询
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	services.StartScheduler()
 	go services.StartPolling(ctx)
 	go services.StartTelegramPolling(ctx)
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.SlogLogger())
 	r.Use(middleware.CORS(cfg.CorsOrigins))
 
 	api := r.Group("/api")
@@ -147,6 +152,9 @@ func main() {
 	}
 	// telegram file proxy (JWT via query, own auth)
 	api.GET("/telegram/file/*file_id", handlers.TelegramProxyFile)
+
+	// log stream SSE (token via query param)
+	auth.GET("/admin/logs/stream", handlers.LogsSSE)
 
 	// websocket (token via query)
 	r.GET("/ws/modems", handlers.ModemStatusWS)

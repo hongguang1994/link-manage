@@ -10,13 +10,17 @@ import (
 	"time"
 )
 
+// zteGateway ZTE 便携 WiFi 设备的默认网关 IP。
 const zteGateway = "192.168.0.1"
 
 var (
+	// goformGet ZTE goform HTTP 查询接口地址。
 	goformGet = "http://" + zteGateway + "/goform/goform_get_cmd_process"
+	// goformSet ZTE goform HTTP 设置接口地址（发短信、更改配置等）。
 	goformSet = "http://" + zteGateway + "/goform/goform_set_cmd_process"
 )
 
+// zteStatusCmds 状态轮询所需的 goform 字段列表（一次请求批量获取）。
 var zteStatusCmds = strings.Join([]string{
 	"modem_main_state", "signalbar", "network_type", "network_provider",
 	"ppp_status", "rssi", "rsrp", "rsrq", "sinr",
@@ -25,19 +29,24 @@ var zteStatusCmds = strings.Join([]string{
 	"sim_imsi", "spn_name_data", "plmn_name",
 }, ",")
 
+// zteInfoCmds 设备基本信息所需的 goform 字段列表（IMEI、型号等静态信息）。
 var zteInfoCmds = strings.Join([]string{
 	"imei", "sim_imsi", "sim_iccid", "phone_num", "msisdn",
 	"device_model", "hardware_version", "software_version",
 }, ",")
 
+// zteMccMnc 国内常见 MCC+MNC 到运营商名称的映射，用于 IMSI 推断运营商。
 var zteMccMnc = map[string]string{
 	"46000": "中国移动", "46002": "中国移动", "46004": "中国移动", "46007": "中国移动",
 	"46001": "中国联通", "46006": "中国联通", "46009": "中国联通",
 	"46003": "中国电信", "46005": "中国电信", "46008": "中国电信", "46011": "中国电信",
 }
 
+// zteHTTPClient 创建带超时的 HTTP 客户端，每次调用独立以避免超时污染。
 func zteHTTPClient(timeout time.Duration) *http.Client { return &http.Client{Timeout: timeout} }
 
+// zteGet 向 ZTE goform_get_cmd_process 发起 GET 请求，返回 JSON 响应 map。
+// 请求带 Referer 头（设备固件校验来源）；失败或解析错误时返回 nil。
 func zteGet(cmd string, timeout time.Duration) map[string]interface{} {
 	u := goformGet + "?multi_data=1&cmd=" + url.QueryEscape(cmd)
 	req, err := http.NewRequest(http.MethodGet, u, nil)
@@ -58,6 +67,7 @@ func zteGet(cmd string, timeout time.Duration) map[string]interface{} {
 	return out
 }
 
+// ztePost 向 ZTE goform_set_cmd_process 发 POST 表单请求，返回 JSON 响应 map。
 func ztePost(data map[string]string, timeout time.Duration) map[string]interface{} {
 	form := url.Values{}
 	for k, v := range data {
@@ -82,6 +92,7 @@ func ztePost(data map[string]string, timeout time.Duration) map[string]interface
 	return out
 }
 
+// zteStr 安全从 map 中提取字符串字段，key 不存在或非字符串时返回空字符串。
 func zteStr(m map[string]interface{}, key string) string {
 	if m == nil {
 		return ""
@@ -104,6 +115,7 @@ func ZteIsAvailable() bool {
 	return ok
 }
 
+// signalbarToQuality 将 ZTE 信号格数（0-5）转换为 0-100 的信号质量百分比。
 func signalbarToQuality(bar string) int {
 	n, err := strconv.Atoi(bar)
 	if err != nil {
@@ -116,6 +128,7 @@ func signalbarToQuality(bar string) int {
 	return q
 }
 
+// imsiToOperator 根据 IMSI 前 5-6 位（MCC+MNC）推断运营商名称（无网络服务时的兜底）。
 func imsiToOperator(imsi string) string {
 	if len(imsi) < 6 {
 		return ""
@@ -129,6 +142,7 @@ func imsiToOperator(imsi string) string {
 	return ""
 }
 
+// networkTypeToTech 将 ZTE 网络类型字符串映射为系统统一的接入技术标识（lte/umts/gsm 等）。
 func networkTypeToTech(nt string) string {
 	switch nt {
 	case "LTE", "4G":
@@ -145,6 +159,8 @@ func networkTypeToTech(nt string) string {
 	return strings.ToLower(nt)
 }
 
+// pppToStatus 将 ZTE 的 ppp_status 和 modem_main_state 映射为统一设备状态。
+// modem_main_state 不为 init_complete 时强制返回 unknown。
 func pppToStatus(ppp, modemState string) string {
 	if modemState != "modem_init_complete" {
 		return "unknown"
@@ -261,6 +277,7 @@ func ZteSendSMS(number, text string) bool {
 	return result != nil && zteStr(result, "result") == "success"
 }
 
+// firstNonEmpty 返回参数列表中第一个非空字符串，全部为空时返回空字符串。
 func firstNonEmpty(vals ...string) string {
 	for _, v := range vals {
 		if v != "" {
@@ -270,6 +287,7 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
+// anyToStr 将 JSON 解析后的 interface{} 值转为字符串（支持 string 和 float64 类型）。
 func anyToStr(v interface{}) string {
 	switch t := v.(type) {
 	case string:

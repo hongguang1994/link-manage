@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// maxSupportFileSize 客服附件上传大小上限（20MB）。
 const maxSupportFileSize = 20 * 1024 * 1024
 
 var supportImageTypes = map[string]bool{
@@ -26,6 +27,7 @@ var supportImageTypes = map[string]bool{
 	"image/webp": true, "image/bmp": true,
 }
 
+// supportMsgOut 将支持消息格式化为 API 响应，包含发送人用户名。
 func supportMsgOut(m *models.SupportMessage) gin.H {
 	var sender models.User
 	name := "?"
@@ -93,6 +95,7 @@ type messageIn struct {
 	AttachmentType string `json:"attachment_type"`
 }
 
+// strPtr 将字符串转为指针，空字符串返回 nil（用于可选字段存储）。
 func strPtr(s string) *string {
 	if s == "" {
 		return nil

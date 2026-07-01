@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuthStore } from '../store/authStore'
 import { Send, Trash2, RefreshCw, Bot, Paperclip, X } from 'lucide-react'
 import { format } from 'date-fns'
@@ -32,7 +33,7 @@ export default function TelegramAdmin() {
   async function load() {
     try {
       const [msgRes, cfgRes] = await Promise.all([
-        getTelegramMessagesApi(0, 200),
+        getTelegramMessagesApi(0, 50),
         getTelegramConfigApi(),
       ])
       setMessages(msgRes.data.slice().reverse())
@@ -95,34 +96,41 @@ export default function TelegramAdmin() {
   const renderText = (text: string) =>
     text.replace(/<[^>]+>/g, '')
 
+  function DocMedia({ fileId, fileUrl, onPreview }: { fileId: string; fileUrl: (id: string) => string; onPreview: (url: string) => void }) {
+    const [failed, setFailed] = useState(false)
+    if (failed) return <a href={fileUrl(fileId)} target="_blank" rel="noreferrer" className="underline text-blue-300 text-sm">⬇ 下载文件</a>
+    return (
+      <img
+        src={fileUrl(fileId)}
+        alt="文件"
+        className="max-w-[240px] rounded-xl cursor-zoom-in"
+        onClick={() => onPreview(fileUrl(fileId))}
+        onError={() => setFailed(true)}
+      />
+    )
+  }
+
+  function PhotoMedia({ fileId, isSticker }: { fileId: string; isSticker: boolean }) {
+    const [failed, setFailed] = useState(false)
+    if (failed) return null
+    return (
+      <img
+        src={fileUrl(fileId)}
+        alt="图片"
+        className={`rounded-xl cursor-zoom-in ${isSticker ? 'w-24 h-24' : 'max-w-[240px]'}`}
+        onClick={() => setLightbox(fileUrl(fileId))}
+        onError={() => setFailed(true)}
+      />
+    )
+  }
+
   function MediaContent({ msg }: { msg: TelegramMessage }) {
     if ((msg.file_type === 'photo' || msg.file_type === 'sticker') && msg.file_id) {
-      return (
-        <img
-          src={fileUrl(msg.file_id)}
-          alt="图片"
-          className={`rounded-xl cursor-zoom-in ${msg.file_type === 'sticker' ? 'w-24 h-24' : 'max-w-[240px]'}`}
-          onClick={() => setLightbox(fileUrl(msg.file_id!))}
-        />
-      )
+      return <PhotoMedia fileId={msg.file_id} isSticker={msg.file_type === 'sticker'} />
     }
     if (msg.file_type === 'document' && msg.file_id) {
       return (
-        <img
-          src={fileUrl(msg.file_id)}
-          alt="文件"
-          className="max-w-[240px] rounded-xl cursor-zoom-in"
-          onClick={() => setLightbox(fileUrl(msg.file_id!))}
-          onError={e => {
-            const el = e.currentTarget
-            const a = document.createElement('a')
-            a.href = fileUrl(msg.file_id!)
-            a.target = '_blank'
-            a.textContent = '⬇ 下载文件'
-            a.className = 'underline text-blue-300 text-sm'
-            el.replaceWith(a)
-          }}
-        />
+        <DocMedia fileId={msg.file_id} fileUrl={fileUrl} onPreview={setLightbox} />
       )
     }
     if (msg.file_type === 'video' && msg.file_id) {
@@ -297,8 +305,8 @@ export default function TelegramAdmin() {
         <span>命令: {messages.filter(m => m.is_command).length}</span>
       </div>
 
-      {/* Lightbox */}
-      {lightbox && (
+      {/* Lightbox — portal 到 body 避免祖先 transform 导致 fixed 失效 */}
+      {lightbox && createPortal(
         <div
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center cursor-zoom-out"
           onClick={() => setLightbox(null)}
@@ -313,7 +321,8 @@ export default function TelegramAdmin() {
             className="absolute top-4 right-6 text-white text-3xl font-light hover:text-gray-300"
             onClick={() => setLightbox(null)}
           >✕</button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

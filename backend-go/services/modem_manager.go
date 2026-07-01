@@ -9,7 +9,8 @@ import (
 	"time"
 )
 
-// ModemInfo mirrors the dict returned by the Python modem_manager.
+// ModemInfo 调制解调器信息结构，镜像 Python modem_manager 返回的字典。
+// Source="zte" 标识来自 ZTE HTTP 驱动而非 mmcli。
 type ModemInfo struct {
 	MmObjectPath       string
 	MmIndex            string
@@ -40,7 +41,7 @@ type ModemInfo struct {
 	Source             string // "zte" for ZTE devices
 }
 
-// InboxMessage is a received SMS parsed from the modem.
+// InboxMessage 从调制解调器解析出的一条收件短信。
 type InboxMessage struct {
 	SmsIndex    string
 	PhoneNumber string
@@ -64,6 +65,7 @@ type execErr struct{ msg string }
 
 func (e *execErr) Error() string { return e.msg }
 
+// run 执行外部命令（通常是 mmcli），带超时控制；超时时杀死进程并返回 errTimeout。
 func run(timeout time.Duration, args ...string) (string, string, error) {
 	cmd := exec.Command(args[0], args[1:]...)
 	var stdout, stderr strings.Builder
@@ -177,6 +179,7 @@ func GetModemInfo(mmPath string) *ModemInfo {
 
 type bearerStats struct{ tx, rx, dur int64 }
 
+// getBearerStats 通过 mmcli 读取 bearer 的流量统计和连接时长。
 func getBearerStats(idx string) bearerStats {
 	out, _, err := run(30*time.Second, "mmcli", "-m", idx, "--list-bearers", "-J")
 	if err != nil {
@@ -222,6 +225,7 @@ func getBearerStats(idx string) bearerStats {
 
 type simInfo struct{ imsi, iccid, opName, opCode string }
 
+// getSimInfo 通过 mmcli 读取 SIM 卡的 IMSI、ICCID 和运营商信息。
 func getSimInfo(simPath string) simInfo {
 	if simPath == "" {
 		return simInfo{}
@@ -246,6 +250,7 @@ func getSimInfo(simPath string) simInfo {
 	return simInfo{p["imsi"], p["iccid"], p["operator-name"], p["operator-code"]}
 }
 
+// parseOwnNumber 从 mmcli generic 字段的 own-numbers 数组提取第一个号码。
 func parseOwnNumber(g map[string]json.RawMessage) string {
 	if v, ok := g["own-numbers"]; ok {
 		var arr []string
@@ -256,6 +261,7 @@ func parseOwnNumber(g map[string]json.RawMessage) string {
 	return ""
 }
 
+// getPhoneNumber 通过 AT+CNUM 命令从调制解调器查询本机号码（own-numbers 为空时的兜底方案）。
 func getPhoneNumber(idx string) string {
 	out, _, err := run(30*time.Second, "mmcli", "-m", idx, "--command=AT+CNUM", "-J")
 	if err != nil {
@@ -277,6 +283,7 @@ func getPhoneNumber(idx string) string {
 	return ""
 }
 
+// mapState 将 mmcli 原始状态字符串映射为系统统一状态常量（connected/disconnected/error/unknown）。
 func mapState(state string) string {
 	switch strings.ToLower(state) {
 	case "registered", "connected":
@@ -382,6 +389,7 @@ func EnableModem(mmIndex string) bool {
 	return err == nil
 }
 
+// asString 将 json.RawMessage 转为字符串，支持带引号和不带引号两种格式。
 func asString(r json.RawMessage) string {
 	if r == nil {
 		return ""
@@ -393,6 +401,7 @@ func asString(r json.RawMessage) string {
 	return strings.Trim(string(r), `"`)
 }
 
+// joinList 将 json.RawMessage 数组转为逗号分隔字符串（用于 access-technologies、ports 等列表字段）。
 func joinList(r json.RawMessage) string {
 	if r == nil {
 		return ""
@@ -404,6 +413,7 @@ func joinList(r json.RawMessage) string {
 	return asString(r)
 }
 
+// atoi64 将字符串解析为 int64，解析失败时返回 0。
 func atoi64(s string) int64 {
 	n, _ := strconv.ParseInt(s, 10, 64)
 	return n

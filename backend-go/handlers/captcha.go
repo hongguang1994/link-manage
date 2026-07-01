@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// captchaChars 排除了易混淆字符 0/O/1/I/l，降低用户辨认难度。
 const captchaChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 var captchaPalettes = [][3]int{
@@ -35,6 +36,7 @@ func GetCaptcha(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": signed, "svg": captchaSVG(string(code))})
 }
 
+// verifyCaptcha 验证 JWT 签名的验证码 token 和用户输入的答案是否匹配（大小写不敏感）。
 func verifyCaptcha(token, answer string) bool {
 	t, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 		return []byte(config.SecretKey), nil
@@ -50,6 +52,7 @@ func verifyCaptcha(token, answer string) bool {
 	return strings.ToUpper(answer) == capCode
 }
 
+// captchaSVG 生成带干扰线和噪点的 SVG 验证码图片。
 func captchaSVG(code string) string {
 	w, h := 160, 52
 	var b strings.Builder
