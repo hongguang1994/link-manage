@@ -10,11 +10,11 @@ type Role struct {
 	Description string `gorm:"type:text" json:"description"`
 	IsSystem    bool   `gorm:"default:false" json:"is_system"` // 系统预置角色，不允许删除
 
-	CanViewSim         bool `gorm:"default:false" json:"can_view_sim"`          // 可查看 SIM 卡列表
-	CanApproveRequests bool `gorm:"default:false" json:"can_approve_requests"`  // 可审批 SIM 卡申请
-	CanViewHistory     bool `gorm:"default:false" json:"can_view_history"`      // 可查看短信记录
-	ReadOnly           bool `gorm:"default:false" json:"read_only"`             // 只读（不可发送短信/创建任务）
-	CanSupport         bool `gorm:"default:false" json:"can_support"`           // 可访问客服功能
+	CanViewSim         bool `gorm:"default:false" json:"can_view_sim"`         // 可查看 SIM 卡列表
+	CanApproveRequests bool `gorm:"default:false" json:"can_approve_requests"` // 可审批 SIM 卡申请
+	CanViewHistory     bool `gorm:"default:false" json:"can_view_history"`     // 可查看短信记录
+	ReadOnly           bool `gorm:"default:false" json:"read_only"`            // 只读（不可发送短信/创建任务）
+	CanSupport         bool `gorm:"default:false" json:"can_support"`          // 可访问客服功能
 
 	// ModemScope 限制角色可管理的设备范围；空列表表示无限制（仅对审批员有自动授权效果）。
 	ModemScope []Modem `gorm:"many2many:role_modem_scope;" json:"-"`

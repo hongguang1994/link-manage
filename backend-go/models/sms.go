@@ -29,7 +29,7 @@ const (
 type SmsMessage struct {
 	ID           uint       `gorm:"primaryKey" json:"id"`
 	ModemID      uint       `gorm:"not null" json:"modem_id"`
-	Direction    string     `gorm:"size:16;not null" json:"direction"`   // inbound/outbound
+	Direction    string     `gorm:"size:16;not null" json:"direction"`    // inbound/outbound
 	PhoneNumber  string     `gorm:"size:30;not null" json:"phone_number"` // 对端号码
 	Content      string     `gorm:"type:text;not null" json:"content"`
 	Status       string     `gorm:"size:16;default:pending" json:"status"`
@@ -39,8 +39,8 @@ type SmsMessage struct {
 	CreatedAt    time.Time  `json:"created_at"`
 
 	MmSmsIndex      string `gorm:"column:mm_sms_index;size:20" json:"mm_sms_index"` // mmcli SMS 对象索引，用于去重
-	ScheduledTaskID *uint  `json:"scheduled_task_id"` // 关联的定时任务（手动发送时为 nil）
-	CreatedByID     *uint  `json:"created_by_id"`     // 发送人
+	ScheduledTaskID *uint  `json:"scheduled_task_id"`                               // 关联的定时任务（手动发送时为 nil）
+	CreatedByID     *uint  `json:"created_by_id"`                                   // 发送人
 }
 
 func (SmsMessage) TableName() string { return "sms_messages" }
@@ -55,7 +55,7 @@ type SmsScheduledTask struct {
 	Recipients     JSONList   `gorm:"type:json;not null" json:"recipients"` // 收件人号码列表
 	Content        string     `gorm:"type:text;not null" json:"content"`
 	CronExpression *string    `gorm:"size:100" json:"cron_expression"` // 与 SendOnceAt 二选一
-	SendOnceAt     *time.Time `json:"send_once_at"` // 一次性发送时间（UTC）
+	SendOnceAt     *time.Time `json:"send_once_at"`                    // 一次性发送时间（UTC）
 	Status         string     `gorm:"size:16;default:active" json:"status"`
 	LastRunAt      *time.Time `json:"last_run_at"`
 	NextRunAt      *time.Time `json:"next_run_at"`

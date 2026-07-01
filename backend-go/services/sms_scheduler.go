@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	cronRunner *cron.Cron                 // cron 调度器，使用 UTC 时区
-	jobIDs     = map[uint]cron.EntryID{}  // task.ID → cron entry ID，用于取消定期任务
-	onceTimers = map[uint]*time.Timer{}   // task.ID → time.Timer，用于取消一次性任务
-	schedMu    sync.Mutex                 // 保护 jobIDs 和 onceTimers 的并发访问
+	cronRunner *cron.Cron                // cron 调度器，使用 UTC 时区
+	jobIDs     = map[uint]cron.EntryID{} // task.ID → cron entry ID，用于取消定期任务
+	onceTimers = map[uint]*time.Timer{}  // task.ID → time.Timer，用于取消一次性任务
+	schedMu    sync.Mutex                // 保护 jobIDs 和 onceTimers 的并发访问
 )
 
 // StartScheduler launches the cron runner and the 60s reload loop.

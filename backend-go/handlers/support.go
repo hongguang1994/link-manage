@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
 	"os"
 	"path/filepath"
-	"crypto/rand"
-	"encoding/hex"
 	"strings"
 	"time"
 

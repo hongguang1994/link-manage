@@ -23,12 +23,12 @@ import (
 const telegramAPIBase = "https://api.telegram.org"
 
 var (
-	tgLastUpdateID int64                                     // 长轮询 offset，避免重复处理同一消息
-	tgReModemArg   = regexp.MustCompile(`^#(\d+)`)          // 匹配 /send #<id> 中的设备 ID
+	tgLastUpdateID int64                           // 长轮询 offset，避免重复处理同一消息
+	tgReModemArg   = regexp.MustCompile(`^#(\d+)`) // 匹配 /send #<id> 中的设备 ID
 )
 
-func tgToken() string  { return config.C.TelegramBotToken }
-func tgChatID() string { return config.C.TelegramChatID }
+func tgToken() string   { return config.C.TelegramBotToken }
+func tgChatID() string  { return config.C.TelegramChatID }
 func tgBaseURL() string { return fmt.Sprintf("%s/bot%s", telegramAPIBase, tgToken()) }
 
 // TelegramSendMessage sends a text message to a chat. Returns success.
@@ -121,9 +121,9 @@ func tgDoSend(m *models.Modem, number, content, chatID string) {
 }
 
 type tgUpdate struct {
-	UpdateID      int64          `json:"update_id"`
-	Message       *tgMessage     `json:"message"`
-	EditedMessage *tgMessage     `json:"edited_message"`
+	UpdateID      int64      `json:"update_id"`
+	Message       *tgMessage `json:"message"`
+	EditedMessage *tgMessage `json:"edited_message"`
 }
 
 type tgMessage struct {

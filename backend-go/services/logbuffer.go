@@ -19,8 +19,8 @@ type LogEntry struct {
 // LogBuffer 环形日志缓冲区，保存最近 cap 条日志并向所有订阅者广播新日志。
 type LogBuffer struct {
 	mu    sync.Mutex
-	lines []LogEntry    // 环形缓冲
-	cap   int           // 最大保留条数
+	lines []LogEntry      // 环形缓冲
+	cap   int             // 最大保留条数
 	subs  []chan LogEntry // 活跃订阅者 channel 列表
 }
 

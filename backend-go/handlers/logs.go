@@ -39,4 +39,3 @@ func LogsSSE(c *gin.Context) {
 		c.Writer.Flush()
 	}
 }
-

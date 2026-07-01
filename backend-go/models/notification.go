@@ -6,7 +6,7 @@ import "time"
 // Audience 决定可见范围：admin / support / all / user（配合 TargetUserID）。
 type Notification struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
-	Type         string    `gorm:"size:32;not null" json:"type"`             // 通知类型，如 sms_failed
+	Type         string    `gorm:"size:32;not null" json:"type"` // 通知类型，如 sms_failed
 	Title        string    `gorm:"size:128;not null" json:"title"`
 	Body         string    `gorm:"type:text;not null;default:''" json:"body"` // 通知正文
 	IsRead       bool      `gorm:"not null;default:false" json:"is_read"`

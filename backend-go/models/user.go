@@ -16,7 +16,7 @@ const (
 type User struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`
 	Username     string    `gorm:"size:50;uniqueIndex;not null" json:"username"`
-	PasswordHash string    `gorm:"size:200;not null" json:"-"` // bcrypt 散列，不对外暴露
+	PasswordHash string    `gorm:"size:200;not null" json:"-"`                // bcrypt 散列，不对外暴露
 	Role         string    `gorm:"size:20;not null;default:user" json:"role"` // admin 或 user
 	IsActive     bool      `gorm:"default:true" json:"is_active"`
 	CreatedAt    time.Time `json:"created_at"`

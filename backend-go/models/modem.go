@@ -15,9 +15,9 @@ const (
 // ZTE 设备使用合成路径 zte:192.168.0.1。
 type Modem struct {
 	ID           uint   `gorm:"primaryKey" json:"id"`
-	DevicePath   string `gorm:"size:100" json:"device_path"`           // 设备节点，如 ttyUSB0
+	DevicePath   string `gorm:"size:100" json:"device_path"`                                               // 设备节点，如 ttyUSB0
 	MmObjectPath string `gorm:"column:mm_object_path;size:200;uniqueIndex;not null" json:"mm_object_path"` // 唯一键
-	Imei         string `gorm:"size:20;uniqueIndex" json:"imei"`       // IMEI，可能为空
+	Imei         string `gorm:"size:20;uniqueIndex" json:"imei"`                                           // IMEI，可能为空
 	Manufacturer string `gorm:"size:100" json:"manufacturer"`
 	Model        string `gorm:"size:100" json:"model"`
 	PhoneNumber  string `gorm:"size:30" json:"phone_number"`
@@ -25,7 +25,7 @@ type Modem struct {
 
 	SignalQuality int       `gorm:"default:0" json:"signal_quality"` // 信号质量 0-100
 	Status        string    `gorm:"size:20;default:unknown" json:"status"`
-	Alias         string    `gorm:"size:100" json:"alias"` // 用户自定义别名
+	Alias         string    `gorm:"size:100" json:"alias"`         // 用户自定义别名
 	IsActive      bool      `gorm:"default:true" json:"is_active"` // false 表示设备已拔出
 	LastSeen      time.Time `json:"last_seen"`
 	CreatedAt     time.Time `json:"created_at"`

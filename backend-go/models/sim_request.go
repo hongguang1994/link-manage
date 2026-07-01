@@ -20,10 +20,10 @@ type SimAccessRequest struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	UserID         uint      `gorm:"not null" json:"user_id"`
 	ModemID        uint      `gorm:"not null" json:"modem_id"`
-	Status         string    `gorm:"size:16;not null;default:pending" json:"status"` // pending/approved/rejected
+	Status         string    `gorm:"size:16;not null;default:pending" json:"status"`      // pending/approved/rejected
 	RequestedLevel string    `gorm:"size:16;not null;default:use" json:"requested_level"` // view 或 use
-	Reason         *string   `gorm:"type:text" json:"reason"`     // 申请理由（可选）
-	AdminNote      *string   `gorm:"type:text" json:"admin_note"` // 审批备注（可选）
+	Reason         *string   `gorm:"type:text" json:"reason"`                             // 申请理由（可选）
+	AdminNote      *string   `gorm:"type:text" json:"admin_note"`                         // 审批备注（可选）
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -37,9 +37,9 @@ type SimGrant struct {
 	UserID       uint       `gorm:"not null;uniqueIndex:uq_sim_grants_user_modem" json:"user_id"`
 	ModemID      uint       `gorm:"not null;uniqueIndex:uq_sim_grants_user_modem" json:"modem_id"`
 	GrantedLevel string     `gorm:"size:16;not null" json:"granted_level"` // view 或 use
-	ExpiresAt    *time.Time `json:"expires_at"`   // nil 表示永久
-	GrantedByID  *uint      `json:"granted_by_id"` // 授权操作人
-	RequestID    *uint      `json:"request_id"`    // 关联的申请记录（直接授权时为 nil）
+	ExpiresAt    *time.Time `json:"expires_at"`                            // nil 表示永久
+	GrantedByID  *uint      `json:"granted_by_id"`                         // 授权操作人
+	RequestID    *uint      `json:"request_id"`                            // 关联的申请记录（直接授权时为 nil）
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 }

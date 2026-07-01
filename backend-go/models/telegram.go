@@ -7,7 +7,7 @@ import "time"
 type TelegramMessage struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	ChatID    string    `gorm:"size:64;not null;index" json:"chat_id"`
-	Username  *string   `gorm:"size:128" json:"username"`  // 发送人用户名（收件时有效）
+	Username  *string   `gorm:"size:128" json:"username"`         // 发送人用户名（收件时有效）
 	Direction string    `gorm:"size:8;not null" json:"direction"` // in / out
 	Text      string    `gorm:"type:text;not null" json:"text"`
 	CreatedAt time.Time `json:"created_at"`
