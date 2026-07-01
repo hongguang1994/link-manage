@@ -5,17 +5,19 @@ import {
   listSimRequestsApi, approveSimRequestApi, rejectSimRequestApi, batchApproveApi,
   type SimAccessRequest, type PermissionLevel,
 } from '../api/simRequests'
+import { useT } from '../i18n'
 
 type FilterStatus = 'pending' | 'approved' | 'rejected' | ''
 
 function StatusBadge({ status, isExpired }: { status: string; isExpired: boolean }) {
+  const t = useT()
   if (status === 'approved' && isExpired) {
-    return <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">已过期</span>
+    return <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">{t('req_status_expired')}</span>
   }
   const cfg = {
-    pending:  { cls: 'text-yellow-400 bg-yellow-400/10', icon: Clock,       label: '待审批' },
-    approved: { cls: 'text-green-400 bg-green-400/10',  icon: CheckCircle,  label: '已批准' },
-    rejected: { cls: 'text-red-400 bg-red-400/10',      icon: XCircle,      label: '已拒绝' },
+    pending:  { cls: 'text-yellow-400 bg-yellow-400/10', icon: Clock,       label: t('req_status_pending') },
+    approved: { cls: 'text-green-400 bg-green-400/10',  icon: CheckCircle,  label: t('req_status_approved') },
+    rejected: { cls: 'text-red-400 bg-red-400/10',      icon: XCircle,      label: t('req_status_rejected') },
   }[status] ?? { cls: 'text-gray-400 bg-gray-700', icon: Clock, label: status }
   const Icon = cfg.icon
   return (
@@ -34,6 +36,7 @@ function ApproveModal({
   onClose: () => void
   onDone: () => void
 }) {
+  const t = useT()
   const [permanent, setPermanent] = useState(true)
   const [expiresAt, setExpiresAt] = useState('')
   const [adminNote, setAdminNote] = useState('')
@@ -55,7 +58,7 @@ function ApproveModal({
       onDone()
       onClose()
     } catch {
-      alert('操作失败')
+      alert(t('req_op_failed'))
     } finally {
       setLoading(false)
     }
@@ -66,7 +69,7 @@ function ApproveModal({
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">
-            批准申请 {items.length > 1 ? `（${items.length} 条）` : ''}
+            {t('req_approve_title')} {items.length > 1 ? `(${items.length})` : ''}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
@@ -81,11 +84,11 @@ function ApproveModal({
           </div>
         )}
         {items.length > 3 && (
-          <p className="text-sm text-gray-300">共 {items.length} 条申请将被批准</p>
+          <p className="text-sm text-gray-300">{t('req_approve_batch_count').replace('{n}', String(items.length))}</p>
         )}
 
         <div>
-          <p className="text-sm text-gray-400 mb-2">授权级别</p>
+          <p className="text-sm text-gray-400 mb-2">{t('req_grant_level')}</p>
           <div className="flex gap-3">
             <button
               onClick={() => setGrantedLevel('use')}
@@ -93,7 +96,7 @@ function ApproveModal({
                 ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                 : 'border-gray-600 text-gray-400 hover:border-gray-500')}
             >
-              使用（可发短信）
+              {t('req_grant_use')}
             </button>
             <button
               onClick={() => setGrantedLevel('view')}
@@ -101,13 +104,13 @@ function ApproveModal({
                 ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                 : 'border-gray-600 text-gray-400 hover:border-gray-500')}
             >
-              仅查看
+              {t('req_grant_view')}
             </button>
           </div>
         </div>
 
         <div>
-          <p className="text-sm text-gray-400 mb-2">有效期</p>
+          <p className="text-sm text-gray-400 mb-2">{t('req_validity')}</p>
           <div className="flex gap-3">
             <button
               onClick={() => setPermanent(true)}
@@ -115,7 +118,7 @@ function ApproveModal({
                 ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                 : 'border-gray-600 text-gray-400 hover:border-gray-500')}
             >
-              永久有效
+              {t('req_permanent')}
             </button>
             <button
               onClick={() => setPermanent(false)}
@@ -123,7 +126,7 @@ function ApproveModal({
                 ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                 : 'border-gray-600 text-gray-400 hover:border-gray-500')}
             >
-              <Calendar className="w-3.5 h-3.5" /> 设置期限
+              <Calendar className="w-3.5 h-3.5" /> {t('req_set_expires')}
             </button>
           </div>
           {!permanent && (
@@ -138,23 +141,23 @@ function ApproveModal({
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">备注（可选）</label>
+          <label className="block text-sm text-gray-400 mb-1">{t('req_note_label')}</label>
           <input
             value={adminNote}
             onChange={e => setAdminNote(e.target.value)}
-            placeholder="给用户的备注信息"
+            placeholder={t('req_note_ph')}
             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
           />
         </div>
 
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">{t('req_cancel')}</button>
           <button
             onClick={submit}
             disabled={loading || (!permanent && !expiresAt)}
             className="px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg text-sm"
           >
-            {loading ? '处理中...' : '确认批准'}
+            {loading ? t('req_processing') : t('req_confirm_approve')}
           </button>
         </div>
       </div>
@@ -171,6 +174,7 @@ function RejectModal({
   onClose: () => void
   onDone: () => void
 }) {
+  const t = useT()
   const [adminNote, setAdminNote] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -181,7 +185,7 @@ function RejectModal({
       onDone()
       onClose()
     } catch {
-      alert('操作失败')
+      alert(t('req_op_failed'))
     } finally {
       setLoading(false)
     }
@@ -191,29 +195,29 @@ function RejectModal({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">拒绝申请</h2>
+          <h2 className="text-lg font-bold text-white">{t('req_reject_title')}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
         <p className="text-sm text-gray-300">
-          拒绝 <span className="text-white font-medium">{item.username}</span> 对 {item.modem_name} 的申请
+          {t('req_reject_desc')} <span className="text-white font-medium">{item.username}</span> {t('req_reject_for')} {item.modem_name}
         </p>
         <div>
-          <label className="block text-sm text-gray-400 mb-1">拒绝原因（可选）</label>
+          <label className="block text-sm text-gray-400 mb-1">{t('req_reject_note_label')}</label>
           <input
             value={adminNote}
             onChange={e => setAdminNote(e.target.value)}
-            placeholder="给用户的说明"
+            placeholder={t('req_reject_note_ph')}
             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
           />
         </div>
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">{t('req_cancel')}</button>
           <button
             onClick={submit}
             disabled={loading}
             className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:bg-gray-700 text-white rounded-lg text-sm"
           >
-            {loading ? '处理中...' : '确认拒绝'}
+            {loading ? t('req_processing') : t('req_confirm_reject')}
           </button>
         </div>
       </div>
@@ -222,6 +226,7 @@ function RejectModal({
 }
 
 export default function SimRequests() {
+  const t = useT()
   const [requests, setRequests] = useState<SimAccessRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterStatus>('pending')
@@ -262,22 +267,22 @@ export default function SimRequests() {
   const selectedItems = requests.filter(r => selected.has(r.id))
 
   const FILTERS: { key: FilterStatus; label: string }[] = [
-    { key: 'pending', label: '待审批' },
-    { key: 'approved', label: '已批准' },
-    { key: 'rejected', label: '已拒绝' },
-    { key: '', label: '全部' },
+    { key: 'pending', label: t('req_filter_pending') },
+    { key: 'approved', label: t('req_filter_approved') },
+    { key: 'rejected', label: t('req_filter_rejected') },
+    { key: '', label: t('req_filter_all') },
   ]
 
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">SIM卡申请审批</h1>
+        <h1 className="text-2xl font-bold text-white">{t('req_title')}</h1>
         <button
           onClick={load}
           disabled={loading}
           className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors disabled:opacity-50"
         >
-          <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} /> 刷新
+          <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} /> {t('req_refresh')}
         </button>
       </div>
 
@@ -299,29 +304,29 @@ export default function SimRequests() {
       {/* batch actions */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 bg-blue-900/30 border border-blue-500/30 rounded-xl px-4 py-3">
-          <span className="text-sm text-blue-300">已选 {selected.size} 条</span>
+          <span className="text-sm text-blue-300">{t('req_selected')} {selected.size} {t('req_selected_unit')}</span>
           <button
             onClick={() => setApproveItems(selectedItems)}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm"
           >
-            <CheckCheck className="w-3.5 h-3.5" /> 批量批准
+            <CheckCheck className="w-3.5 h-3.5" /> {t('req_batch_approve')}
           </button>
           <button
             onClick={() => setSelected(new Set())}
             className="text-sm text-gray-400 hover:text-white"
           >
-            取消选择
+            {t('req_cancel_select')}
           </button>
         </div>
       )}
 
       {loading ? (
         <div className="flex items-center gap-2 text-gray-400 py-10 justify-center">
-          <RefreshCw className="w-4 h-4 animate-spin" /> 加载中...
+          <RefreshCw className="w-4 h-4 animate-spin" /> {t('req_loading')}
         </div>
       ) : requests.length === 0 ? (
         <div className="bg-gray-800 border border-dashed border-gray-600 rounded-xl p-12 text-center text-gray-500">
-          暂无申请记录
+          {t('req_empty')}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-700">
@@ -334,14 +339,14 @@ export default function SimRequests() {
                       className="rounded border-gray-600 bg-gray-700 text-blue-500" />
                   )}
                 </th>
-                <th className="px-4 py-3 text-left">用户</th>
-                <th className="px-4 py-3 text-left">申请设备</th>
-                <th className="px-4 py-3 text-left">申请级别</th>
-                <th className="px-4 py-3 text-left">申请理由</th>
-                <th className="px-4 py-3 text-left">状态</th>
-                <th className="px-4 py-3 text-left">有效期</th>
-                <th className="px-4 py-3 text-left">申请时间</th>
-                <th className="px-4 py-3 text-left">操作</th>
+                <th className="px-4 py-3 text-left">{t('req_col_user')}</th>
+                <th className="px-4 py-3 text-left">{t('req_col_device')}</th>
+                <th className="px-4 py-3 text-left">{t('req_col_level')}</th>
+                <th className="px-4 py-3 text-left">{t('req_col_reason')}</th>
+                <th className="px-4 py-3 text-left">{t('req_col_status')}</th>
+                <th className="px-4 py-3 text-left">{t('req_col_expires')}</th>
+                <th className="px-4 py-3 text-left">{t('req_col_time')}</th>
+                <th className="px-4 py-3 text-left">{t('req_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -360,9 +365,9 @@ export default function SimRequests() {
                   <td className="px-4 py-3">
                     <span className={clsx('text-xs px-2 py-0.5 rounded-full', r.requested_level === 'use'
                       ? 'bg-blue-900/40 text-blue-300' : 'bg-gray-700 text-gray-400')}>
-                      {r.requested_level === 'use' ? '使用' : '查看'}
+                      {r.requested_level === 'use' ? t('req_level_use') : t('req_level_view')}
                       {r.granted_level && r.granted_level !== r.requested_level && (
-                        <span className="ml-1 text-yellow-400">→{r.granted_level === 'use' ? '使用' : '查看'}</span>
+                        <span className="ml-1 text-yellow-400">→{r.granted_level === 'use' ? t('req_level_use') : t('req_level_view')}</span>
                       )}
                     </span>
                   </td>
@@ -370,7 +375,7 @@ export default function SimRequests() {
                   <td className="px-4 py-3"><StatusBadge status={r.status} isExpired={r.is_expired} /></td>
                   <td className="px-4 py-3 text-gray-300 text-xs">
                     {r.status === 'approved' && !r.is_expired
-                      ? (r.expires_at ? r.expires_at.slice(0, 10) : '永久')
+                      ? (r.expires_at ? r.expires_at.slice(0, 10) : t('req_expires_permanent'))
                       : '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs">{r.created_at?.slice(0, 16).replace('T', ' ')}</td>
@@ -381,13 +386,13 @@ export default function SimRequests() {
                           onClick={() => setApproveItems([r])}
                           className="flex items-center gap-1 px-2.5 py-1 bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white rounded-lg text-xs transition-colors"
                         >
-                          <CheckCircle className="w-3.5 h-3.5" /> 批准
+                          <CheckCircle className="w-3.5 h-3.5" /> {t('req_approve')}
                         </button>
                         <button
                           onClick={() => setRejectItem(r)}
                           className="flex items-center gap-1 px-2.5 py-1 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded-lg text-xs transition-colors"
                         >
-                          <XCircle className="w-3.5 h-3.5" /> 拒绝
+                          <XCircle className="w-3.5 h-3.5" /> {t('req_reject')}
                         </button>
                       </div>
                     )}

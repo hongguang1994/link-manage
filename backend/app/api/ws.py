@@ -52,7 +52,7 @@ async def modem_status_ws(websocket: WebSocket, token: str = ""):
         while True:
             db = SessionLocal()
             try:
-                q = db.query(Modem)
+                q = db.query(Modem).filter(Modem.is_active == True)
                 if visible_ids is not None:
                     q = q.filter(Modem.id.in_(visible_ids))
                 modems = q.all()

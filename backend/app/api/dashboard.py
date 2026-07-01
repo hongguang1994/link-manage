@@ -43,9 +43,10 @@ def get_dashboard_stats(
     for row in sms_rows:
         day_str = str(row.day)
         if day_str in trend:
-            if row.status == SmsStatus.SENT:
+            s = row.status.lower() if row.status else ""
+            if s == SmsStatus.SENT:
                 trend[day_str]["sent"] = row.cnt
-            elif row.status == SmsStatus.FAILED:
+            elif s == SmsStatus.FAILED:
                 trend[day_str]["failed"] = row.cnt
 
     # Month-to-date success rate
@@ -61,9 +62,10 @@ def get_dashboard_stats(
     )
     month_stats = {"sent": 0, "failed": 0, "pending": 0}
     for row in month_rows:
-        if row.status == SmsStatus.SENT:
+        s = row.status.lower() if row.status else ""
+        if s == SmsStatus.SENT:
             month_stats["sent"] = row.cnt
-        elif row.status == SmsStatus.FAILED:
+        elif s == SmsStatus.FAILED:
             month_stats["failed"] = row.cnt
         else:
             month_stats["pending"] += row.cnt
@@ -76,7 +78,9 @@ def get_dashboard_stats(
     )
     task_stats = {"active": 0, "paused": 0, "completed": 0, "failed": 0}
     for row in task_rows:
-        task_stats[row.status] = row.cnt
+        key = row.status.lower() if row.status else ""
+        if key in task_stats:
+            task_stats[key] = row.cnt
 
     return {
         "sms_trend": list(trend.values()),

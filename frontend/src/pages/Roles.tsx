@@ -4,6 +4,7 @@ import clsx from 'clsx'
 import { listRolesApi, createRoleApi, updateRoleApi, deleteRoleApi, type RoleOut, type RoleCreate } from '../api/roles'
 import { getAvailableModemsApi, type Modem } from '../api/modems'
 import { useLangStore } from '../store/langStore'
+import { useT } from '../i18n'
 
 // ── System role i18n map ──────────────────────────────────────────────────────
 const SYSTEM_ROLE_I18N: Record<string, { name: string; description: string }> = {
@@ -44,10 +45,10 @@ const EMPTY_FORM: RoleCreate = {
   read_only: false, can_support: false, allowed_modem_ids: null,
 }
 
-function RoleModal({ role, onClose, onSaved, lang }: {
-  role: RoleOut | null; onClose: () => void; onSaved: () => void; lang: string
+function RoleModal({ role, onClose, onSaved }: {
+  role: RoleOut | null; onClose: () => void; onSaved: () => void
 }) {
-  const zh = lang === 'zh'
+  const t = useT()
   const [form, setForm] = useState<RoleCreate>(
     role ? {
       name: role.name, description: role.description,
@@ -64,14 +65,14 @@ function RoleModal({ role, onClose, onSaved, lang }: {
   const set = (k: keyof RoleCreate, v: unknown) => setForm(f => ({ ...f, [k]: v }))
 
   const save = async () => {
-    if (!form.name.trim()) { setErr(zh ? '请填写角色名称' : 'Role name required'); return }
+    if (!form.name.trim()) { setErr(t('roles_name_required')); return }
     setSaving(true); setErr('')
     try {
       if (role) await updateRoleApi(role.id, form)
       else await createRoleApi(form)
       onSaved()
     } catch (e: any) {
-      setErr(e?.response?.data?.detail ?? (zh ? '保存失败' : 'Save failed'))
+      setErr(e?.response?.data?.detail ?? t('roles_save_failed'))
     } finally { setSaving(false) }
   }
 
@@ -81,7 +82,7 @@ function RoleModal({ role, onClose, onSaved, lang }: {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
           <h2 className="font-semibold text-white text-lg">
-            {role ? (zh ? '编辑角色' : 'Edit Role') : (zh ? '新建角色' : 'New Role')}
+            {role ? t('roles_edit_title') : t('roles_new_title')}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
@@ -90,33 +91,33 @@ function RoleModal({ role, onClose, onSaved, lang }: {
         <div className="p-5 space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{zh ? '角色名称' : 'Role name'}</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('roles_name_label')}</label>
             <input
               value={form.name}
               onChange={e => set('name', e.target.value)}
               disabled={!!role?.is_system}
-              placeholder={zh ? '输入角色名…' : 'Enter role name…'}
+              placeholder={t('roles_name_ph')}
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
             />
           </div>
           {/* Description */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">{zh ? '描述' : 'Description'}</label>
+            <label className="block text-xs text-gray-400 mb-1">{t('roles_desc_label')}</label>
             <input
               value={form.description}
               onChange={e => set('description', e.target.value)}
-              placeholder={zh ? '角色描述（可选）' : 'Optional description'}
+              placeholder={t('roles_desc_ph')}
               className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
             />
           </div>
 
           {/* Permissions */}
           <div className="bg-gray-750 border border-gray-700 rounded-lg px-4 py-1">
-            <PermRow label={zh ? '只读模式（禁止所有写操作）' : 'Read-only (no write)'} checked={form.read_only} onChange={v => set('read_only', v)} />
-            <PermRow label={zh ? '查看 SIM 卡' : 'View SIM cards'} checked={form.can_view_sim} onChange={v => set('can_view_sim', v)} />
-            <PermRow label={zh ? '审批 SIM 卡申请' : 'Approve SIM requests'} checked={!!form.can_approve_requests} onChange={v => set('can_approve_requests', v)} disabled={form.read_only} />
-            <PermRow label={zh ? '查看短信记录' : 'View SMS history'} checked={form.can_view_history} onChange={v => set('can_view_history', v)} />
-            <PermRow label={zh ? '回复用户咨询（客服权限）' : 'Reply to support chats'} checked={!!form.can_support} onChange={v => set('can_support', v)} />
+            <PermRow label={t('roles_perm_readonly')} checked={form.read_only} onChange={v => set('read_only', v)} />
+            <PermRow label={t('roles_perm_can_view_sim')} checked={form.can_view_sim} onChange={v => set('can_view_sim', v)} />
+            <PermRow label={t('roles_perm_can_approve')} checked={!!form.can_approve_requests} onChange={v => set('can_approve_requests', v)} disabled={form.read_only} />
+            <PermRow label={t('roles_perm_can_history')} checked={form.can_view_history} onChange={v => set('can_view_history', v)} />
+            <PermRow label={t('roles_perm_can_support')} checked={!!form.can_support} onChange={v => set('can_support', v)} />
           </div>
 
           {/* SIM card binding */}
@@ -125,21 +126,21 @@ function RoleModal({ role, onClose, onSaved, lang }: {
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs text-gray-400">
                   {form.can_approve_requests
-                    ? (zh ? '管辖的 SIM 卡（审批范围）' : 'Managed SIM cards (approval scope)')
-                    : (zh ? '自动授权的 SIM 卡' : 'Auto-granted SIM cards')}
+                    ? t('roles_managed_sims')
+                    : t('roles_auto_grant_sims')}
                 </label>
                 <button type="button" onClick={() => set('allowed_modem_ids', form.allowed_modem_ids == null ? [] : null)}
                   className="text-[10px] px-2 py-0.5 rounded bg-gray-700 text-gray-400 hover:text-white transition-colors">
                   {form.allowed_modem_ids == null
-                    ? (zh ? '切换为指定卡' : 'Switch to specific')
-                    : (zh ? (form.can_approve_requests ? '切换为不限制' : '切换为不自动授权') : (form.can_approve_requests ? 'Switch to unlimited' : 'Switch to no auto-grant'))}
+                    ? t('roles_switch_specific')
+                    : (form.can_approve_requests ? t('roles_switch_unlimited') : t('roles_switch_no_auto'))}
                 </button>
               </div>
               {form.allowed_modem_ids == null ? (
                 <p className="text-xs text-gray-500 italic">
                   {form.can_approve_requests
-                    ? (zh ? '不限制 — 可审批所有SIM卡申请' : 'Unlimited — can approve all cards')
-                    : (zh ? '不自动授权 — 用户需手动申请' : 'No auto-grant — users must apply')}
+                    ? t('roles_unlimited_desc')
+                    : t('roles_no_auto_desc')}
                 </p>
               ) : (
                 <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-2 max-h-36 overflow-y-auto space-y-1">
@@ -166,10 +167,10 @@ function RoleModal({ role, onClose, onSaved, lang }: {
 
         {/* Footer */}
         <div className="flex justify-end gap-2 px-5 pb-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600">{zh ? '取消' : 'Cancel'}</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600">{t('roles_cancel')}</button>
           <button onClick={save} disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50 flex items-center gap-1.5">
             <Check className="w-4 h-4" />
-            {saving ? (zh ? '保存中…' : 'Saving…') : (zh ? '保存' : 'Save')}
+            {saving ? t('roles_saving') : t('roles_save')}
           </button>
         </div>
       </div>
@@ -181,13 +182,13 @@ function RoleModal({ role, onClose, onSaved, lang }: {
 function RoleCard({ role, onEdit, onDelete, lang }: {
   role: RoleOut; onEdit: () => void; onDelete: () => void; lang: string
 }) {
-  const zh = lang === 'zh'
+  const t = useT()
   const { name: displayName, description: displayDesc } = roleLabel(role, lang)
   const perms = [
-    { label: zh ? '查看SIM' : 'View SIM', on: role.can_view_sim },
-    { label: zh ? '审批申请' : 'Approve', on: role.can_approve_requests },
-    { label: zh ? '查看记录' : 'History', on: role.can_view_history },
-    { label: zh ? '客服' : 'Support', on: role.can_support },
+    { label: t('roles_perm_view_sim'), on: role.can_view_sim },
+    { label: t('roles_perm_approve'), on: role.can_approve_requests },
+    { label: t('roles_perm_history'), on: role.can_view_history },
+    { label: t('roles_perm_support'), on: role.can_support },
   ]
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-indigo-500/50 transition-colors">
@@ -197,12 +198,12 @@ function RoleCard({ role, onEdit, onDelete, lang }: {
             <h3 className="font-semibold text-white">{displayName}</h3>
             {role.is_system && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-700/50">
-                {zh ? '系统' : 'System'}
+                {t('roles_system_badge')}
               </span>
             )}
             {role.read_only && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-900/60 text-yellow-300 border border-yellow-700/50">
-                {zh ? '只读' : 'Read-only'}
+                {t('roles_readonly_badge')}
               </span>
             )}
           </div>
@@ -235,8 +236,8 @@ function RoleCard({ role, onEdit, onDelete, lang }: {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Roles() {
+  const t = useT()
   const lang = useLangStore(s => s.lang)
-  const zh = lang === 'zh'
   const [roles, setRoles] = useState<RoleOut[]>([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState<{ open: boolean; role: RoleOut | null }>({ open: false, role: null })
@@ -249,7 +250,7 @@ export default function Roles() {
   useEffect(() => { load() }, [])
 
   const handleDelete = async (role: RoleOut) => {
-    if (!confirm(zh ? `确认删除角色「${role.name}」？` : `Delete role "${role.name}"?`)) return
+    if (!confirm(t('roles_confirm_delete').replace('{name}', role.name))) return
     await deleteRoleApi(role.id)
     load()
   }
@@ -260,30 +261,26 @@ export default function Roles() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <ShieldCheck className="w-6 h-6 text-indigo-400" />
-          {zh ? '角色管理' : 'Role Management'}
+          {t('roles_title')}
         </h1>
         <button
           onClick={() => setModal({ open: true, role: null })}
           className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
-          {zh ? '新建角色' : 'New Role'}
+          {t('roles_new')}
         </button>
       </div>
 
       {/* RBAC explanation banner */}
       <div className="bg-indigo-900/20 border border-indigo-700/40 rounded-xl p-4 flex items-start gap-3 text-sm text-indigo-300">
         <ChevronRight className="w-4 h-4 mt-0.5 shrink-0" />
-        <span>
-          {zh
-            ? '角色定义了用户的功能权限。在「用户管理」中为每位用户分配角色。管理员账号（系统角色）始终拥有全部权限。'
-            : 'Roles define what users can access. Assign roles in User Management. Admin accounts always have full access.'}
-        </span>
+        <span>{t('roles_banner')}</span>
       </div>
 
       {/* Role grid */}
       {loading ? (
-        <p className="text-gray-500 text-sm">{zh ? '加载中…' : 'Loading…'}</p>
+        <p className="text-gray-500 text-sm">{t('roles_loading')}</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {roles.map(role => (
@@ -301,7 +298,6 @@ export default function Roles() {
       {modal.open && (
         <RoleModal
           role={modal.role}
-          lang={lang}
           onClose={() => setModal({ open: false, role: null })}
           onSaved={() => { setModal({ open: false, role: null }); load() }}
         />

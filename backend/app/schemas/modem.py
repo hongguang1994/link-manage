@@ -36,6 +36,18 @@ class ModemOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+    imsi: Optional[str] = None
+    iccid: Optional[str] = None
+    firmware_revision: Optional[str] = None
+    hardware_revision: Optional[str] = None
+    current_bands: Optional[str] = None
+    sim_operator_name: Optional[str] = None
+    sim_operator_code: Optional[str] = None
+    current_modes: Optional[str] = None
+    ports: Optional[str] = None
+    plugin: Optional[str] = None
+
+
 class ModemDetail(ModemOut):
     sms_sent: int = 0
     sms_received: int = 0

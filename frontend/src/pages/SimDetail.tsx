@@ -199,7 +199,14 @@ export default function SimDetail() {
         <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_sim_info')}</h2>
           <InfoRow label={t('detail_phone')} value={modem.phone_number || t('unknown')} />
+          <InfoRow label="IMSI" value={<span className="font-mono text-xs">{(modem as any).imsi || t('none')}</span>} />
+          <InfoRow label="ICCID" value={<span className="font-mono text-xs">{(modem as any).iccid || t('none')}</span>} />
           <InfoRow label={t('detail_imei')} value={<span className="font-mono text-xs">{modem.imei || t('none')}</span>} />
+          <InfoRow label={t('detail_sim_operator')} value={
+            (modem as any).sim_operator_name
+              ? `${(modem as any).sim_operator_name}${(modem as any).sim_operator_code ? ` (${(modem as any).sim_operator_code})` : ''}`
+              : t('none')
+          } />
           <InfoRow label={t('detail_operator')} value={modem.operator || t('none')} />
           <InfoRow label={t('detail_reg')} value={regLabel(modem.registration_state)} />
           <InfoRow label={t('detail_tech')} value={techLabel(modem.access_technologies)} />
@@ -208,12 +215,30 @@ export default function SimDetail() {
 
         <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
           <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_hardware')}</h2>
-          <InfoRow label="Manufacturer" value={modem.manufacturer || t('none')} />
-          <InfoRow label="Model" value={modem.model || t('none')} />
+          <InfoRow label={t('detail_manufacturer')} value={modem.manufacturer || t('none')} />
+          <InfoRow label={t('detail_model')} value={modem.model || t('none')} />
+          <InfoRow label={t('detail_firmware')} value={<span className="font-mono text-xs">{(modem as any).firmware_revision || t('none')}</span>} />
+          <InfoRow label={t('detail_hw_rev')} value={(modem as any).hardware_revision || t('none')} />
+          <InfoRow label={t('detail_plugin')} value={(modem as any).plugin || t('none')} />
           <InfoRow label={t('detail_device')} value={<span className="font-mono text-xs">{modem.device_path || t('none')}</span>} />
-          <InfoRow label="D-Bus" value={<span className="font-mono text-xs truncate block max-w-full">{modem.mm_object_path || t('none')}</span>} />
           <InfoRow label={t('detail_conn_since')} value={fmtTime(modem.created_at)} />
           <InfoRow label={t('detail_last_seen')} value={fmtTime(modem.last_seen)} />
+        </section>
+
+        <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_network_mode')}</h2>
+          <InfoRow label={t('detail_current_mode')} value={(modem as any).current_modes || t('none')} />
+          <InfoRow label={t('detail_ports')} value={<span className="font-mono text-xs">{(modem as any).ports || t('none')}</span>} />
+        </section>
+
+        <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">{t('detail_bands')}</h2>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {((modem as any).current_bands || '').split(',').filter(Boolean).map((b: string) => (
+              <span key={b} className="px-2 py-0.5 bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs rounded-full font-mono">{b.trim()}</span>
+            ))}
+            {!(modem as any).current_bands && <span className="text-sm text-gray-500">{t('none')}</span>}
+          </div>
         </section>
 
         <section className="bg-gray-800 rounded-xl border border-gray-700 p-4">

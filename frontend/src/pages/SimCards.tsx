@@ -71,7 +71,7 @@ export default function SimCards() {
       const res = await mySimRequestsApi()
       setMyRequests(res.data)
     } catch (err: any) {
-      alert(err.response?.data?.detail || '申请失败')
+      alert(err.response?.data?.detail || t('sim_status_applying'))
     } finally {
       setApplying(null)
     }
@@ -196,10 +196,10 @@ export default function SimCards() {
             <p className="text-gray-500">{t('sim_no_device')}</p>
           ) : (
             <>
-              <p className="text-gray-400">暂无授权的 SIM 卡</p>
-              <p className="text-gray-600 text-sm">前往资源库申请 SIM 卡使用权限</p>
+              <p className="text-gray-400">{t('sim_no_auth')}</p>
+              <p className="text-gray-600 text-sm">{t('sim_go_resources')}</p>
               <a href="/resources" className="inline-block mt-1 text-sm text-blue-400 hover:text-blue-300">
-                去资源库 →
+                {t('sim_go_resources_link')}
               </a>
             </>
           )}
@@ -262,12 +262,12 @@ export default function SimCards() {
                       if (status === 'access') return <ChevronRight className="w-4 h-4 text-gray-500" onClick={() => navigate(`/modems/${r.id}`)} />
                       if (status === 'pending') return (
                         <span className="inline-flex items-center gap-1 text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded-full">
-                          <Clock className="w-3 h-3" /> 审批中
+                          <Clock className="w-3 h-3" /> {t('sim_status_pending')}
                         </span>
                       )
                       if (status === 'approved') return (
                         <span className="inline-flex items-center gap-1 text-xs text-green-400 bg-green-400/10 px-2 py-1 rounded-full">
-                          <CheckCircle className="w-3 h-3" /> 已授权
+                          <CheckCircle className="w-3 h-3" /> {t('sim_status_approved')}
                         </span>
                       )
                       return (
@@ -277,7 +277,7 @@ export default function SimCards() {
                           className="inline-flex items-center gap-1 text-xs text-blue-400 bg-blue-400/10 hover:bg-blue-400/20 px-2 py-1 rounded-full transition-colors disabled:opacity-50"
                         >
                           <ClipboardList className="w-3 h-3" />
-                          {applying === r.id ? '提交中...' : '申请使用'}
+                          {applying === r.id ? t('sim_status_applying') : t('sim_status_apply')}
                         </button>
                       )
                     })()}

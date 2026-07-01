@@ -13,12 +13,8 @@ const SENT_COLOR = '#3b82f6'
 const FAIL_COLOR = '#ef4444'
 const PIE_COLORS = ['#10b981', '#ef4444', '#94a3b8']
 
-const TASK_BARS = [
-  { key: 'active',    label: '活跃', color: '#3b82f6' },
-  { key: 'completed', label: '完成', color: '#10b981' },
-  { key: 'failed',    label: '失败', color: '#ef4444' },
-  { key: 'paused',    label: '暂停', color: '#f59e0b' },
-] as const
+const TASK_KEYS = ['active', 'completed', 'failed', 'paused'] as const
+const TASK_COLORS: Record<string, string> = { active: '#3b82f6', completed: '#10b981', failed: '#ef4444', paused: '#f59e0b' }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -60,6 +56,13 @@ export default function Dashboard() {
   const t = useT()
   const [stats, setStats] = useState<DashboardStats | null>(null)
 
+  const taskLabels: Record<string, string> = {
+    active: t('dash_task_active'),
+    completed: t('dash_task_completed'),
+    failed: t('dash_task_failed'),
+    paused: t('dash_task_paused'),
+  }
+
   const connected = modems.filter(m => m.status === 'connected').length
   const total = modems.length
   const offline = total - connected
@@ -77,9 +80,9 @@ export default function Dashboard() {
 
   // Pie data for month SMS
   const pieData = stats ? [
-    { name: '成功', value: stats.month_sms.sent },
-    { name: '失败', value: stats.month_sms.failed },
-    { name: '待发', value: stats.month_sms.pending },
+    { name: t('dash_rate_sent'),    value: stats.month_sms.sent },
+    { name: t('dash_rate_failed'),  value: stats.month_sms.failed },
+    { name: t('dash_rate_pending'), value: stats.month_sms.pending },
   ] : []
 
   // Signal bar chart data from live modem store
@@ -91,7 +94,7 @@ export default function Dashboard() {
 
   // Task bar data
   const taskData = stats
-    ? TASK_BARS.map(b => ({ name: b.label, value: stats.tasks[b.key], fill: b.color }))
+    ? TASK_KEYS.map(k => ({ name: taskLabels[k], value: stats.tasks[k], fill: TASK_COLORS[k] }))
     : []
 
   return (
@@ -102,7 +105,7 @@ export default function Dashboard() {
         <p className="text-sm text-blue-300/60 mt-0.5">
           {connected > 0
             ? <><span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 align-middle" style={{ boxShadow: '0 0 6px #34d399' }} />{connected} {t('dash_online')}</>
-            : <span className="text-slate-500">暂无在线设备</span>}
+            : <span className="text-slate-500">{t('dash_no_online')}</span>}
         </p>
       </div>
 
@@ -133,17 +136,17 @@ export default function Dashboard() {
 
       {/* Charts row 1: SMS trend + Success rate */}
       <div>
-        <SectionTitle>短信统计</SectionTitle>
+        <SectionTitle>{t('dash_sms_section')}</SectionTitle>
         <div className="grid grid-cols-3 gap-4">
           {/* SMS trend - spans 2 cols */}
           <div className="col-span-2">
-            <ChartCard title="发送趋势" subtitle="近 7 天 · 逐日统计">
+            <ChartCard title={t('dash_trend_title')} subtitle={t('dash_trend_subtitle')}>
               <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <span style={{ width: 20, height: 2, background: SENT_COLOR, display: 'inline-block', borderRadius: 1 }} />成功
+                  <span style={{ width: 20, height: 2, background: SENT_COLOR, display: 'inline-block', borderRadius: 1 }} />{t('dash_trend_sent')}
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <span style={{ width: 20, height: 2, background: FAIL_COLOR, display: 'inline-block', borderRadius: 1, borderTop: `2px dashed ${FAIL_COLOR}` }} />失败
+                  <span style={{ width: 20, height: 2, background: FAIL_COLOR, display: 'inline-block', borderRadius: 1, borderTop: `2px dashed ${FAIL_COLOR}` }} />{t('dash_trend_failed')}
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={180}>
@@ -153,15 +156,15 @@ export default function Dashboard() {
                     tickFormatter={v => v.slice(5)} />
                   <YAxis tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="sent" name="成功" stroke={SENT_COLOR} strokeWidth={2} dot={{ r: 3, fill: SENT_COLOR }} activeDot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="failed" name="失败" stroke={FAIL_COLOR} strokeWidth={2} strokeDasharray="4 3" dot={{ r: 3, fill: FAIL_COLOR }} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="sent" name={t('dash_trend_sent')} stroke={SENT_COLOR} strokeWidth={2} dot={{ r: 3, fill: SENT_COLOR }} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="failed" name={t('dash_trend_failed')} stroke={FAIL_COLOR} strokeWidth={2} strokeDasharray="4 3" dot={{ r: 3, fill: FAIL_COLOR }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </ChartCard>
           </div>
 
           {/* Donut: success rate */}
-          <ChartCard title="发送成功率" subtitle="本月累计">
+          <ChartCard title={t('dash_rate_title')} subtitle={t('dash_rate_subtitle')}>
             <ResponsiveContainer width="100%" height={140}>
               <PieChart>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={42} outerRadius={62}
@@ -185,16 +188,16 @@ export default function Dashboard() {
 
       {/* Charts row 2: Task status + Signal */}
       <div>
-        <SectionTitle>设备与任务</SectionTitle>
+        <SectionTitle>{t('dash_device_section')}</SectionTitle>
         <div className="grid grid-cols-2 gap-4">
           {/* Task status */}
-          <ChartCard title="定时任务状态" subtitle="全部任务按状态分布">
+          <ChartCard title={t('dash_task_title')} subtitle={t('dash_task_subtitle')}>
             <ResponsiveContainer width="100%" height={150}>
               <BarChart data={taskData} layout="vertical" margin={{ top: 0, right: 16, bottom: 0, left: 16 }}>
                 <XAxis type="number" tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} width={32} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" name="数量" radius={[0, 4, 4, 0]} maxBarSize={18}>
+                <Bar dataKey="value" name={t('dash_task_count')} radius={[0, 4, 4, 0]} maxBarSize={18}>
                   {taskData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                 </Bar>
               </BarChart>
@@ -202,14 +205,14 @@ export default function Dashboard() {
           </ChartCard>
 
           {/* Signal quality */}
-          <ChartCard title="设备信号强度" subtitle="当前实时值（0–100）">
+          <ChartCard title={t('dash_signal_title')} subtitle={t('dash_signal_subtitle')}>
             <ResponsiveContainer width="100%" height={150}>
               <BarChart data={signalData} margin={{ top: 0, right: 8, bottom: 0, left: -16 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(59,130,246,0.08)" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="signal" name="信号" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                <Bar dataKey="signal" name={t('dash_signal_label')} radius={[4, 4, 0, 0]} maxBarSize={28}>
                   {signalData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                 </Bar>
               </BarChart>

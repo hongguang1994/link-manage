@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.database import Base, engine
 # 显式导入所有 model 模块，确保 SQLAlchemy 在 create_all 前完成元数据注册
 # 若省略这些导入，对应表将不会被 Base.metadata.create_all 创建
-from app.models import user, support, notification
+from app.models import user, support, notification, telegram as telegram_model
 from app.models import role as role_model
 from app.models import sim_request as sim_request_model
 from app.api import modems, sms
@@ -21,8 +21,10 @@ from app.api.support import router as support_router
 from app.api.notifications import router as notifications_router
 from app.api.sim_requests import router as sim_requests_router
 from app.api.dashboard import router as dashboard_router
+from app.api.telegram import router as telegram_router
 from app.services import modem_poller
 from app.services.sms_scheduler import start as scheduler_start, stop as scheduler_stop
+from app.services import telegram_bot
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,10 +36,12 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     scheduler_start()
     poller_task = asyncio.create_task(modem_poller.start_polling())
+    await telegram_bot.start_polling()
     yield
     modem_poller.stop_polling()
     poller_task.cancel()
     scheduler_stop()
+    await telegram_bot.stop_polling()
 
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
@@ -61,6 +65,7 @@ app.include_router(support_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
 app.include_router(sim_requests_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(telegram_router, prefix="/api")
 
 
 @app.get("/api/health")

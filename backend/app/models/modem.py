@@ -41,5 +41,17 @@ class Modem(Base):
     rx_bytes = Column(Integer, default=0)       # bytes received via bearer
     connection_duration = Column(Integer, default=0)  # seconds
 
+    # SIM card details
+    imsi = Column(String(20))
+    iccid = Column(String(30))
+    firmware_revision = Column(String(100))
+    hardware_revision = Column(String(50))
+    current_bands = Column(String(500))         # comma-separated band list
+    sim_operator_name = Column(String(100))     # SIM card operator name (e.g. giffgaff)
+    sim_operator_code = Column(String(20))      # MCC+MNC (e.g. 23410)
+    current_modes = Column(String(200))         # e.g. "allowed: 2g, 3g, 4g; preferred: 4g"
+    ports = Column(String(300))                 # comma-separated port list
+    plugin = Column(String(50))                 # MM plugin name (e.g. quectel)
+
     sms_messages = relationship("SmsMessage", back_populates="modem")
     scheduled_tasks = relationship("SmsScheduledTask", back_populates="modem")

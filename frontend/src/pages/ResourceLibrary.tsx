@@ -5,14 +5,7 @@ import clsx from 'clsx'
 import { getAvailableModemsApi, type Modem } from '../api/modems'
 import { mySimRequestsApi, myGrantsApi, createSimRequestApi, type SimAccessRequest, type SimGrant, type PermissionLevel } from '../api/simRequests'
 import { useAuthStore } from '../store/authStore'
-import { useLangStore } from '../store/langStore'
-
-const STATUS_CFG = {
-  connected:    { icon: Wifi,        color: 'text-emerald-400', dot: '#34d399', label: '在线' },
-  disconnected: { icon: WifiOff,     color: 'text-slate-500',   dot: '#64748b', label: '离线' },
-  error:        { icon: AlertCircle, color: 'text-red-400',     dot: '#f87171', label: '故障' },
-  unknown:      { icon: HelpCircle,  color: 'text-amber-400',   dot: '#fbbf24', label: '未知' },
-} as const
+import { useT } from '../i18n'
 
 type AccessStatus = 'use' | 'view' | 'pending' | 'none' | 'expired'
 
@@ -63,16 +56,8 @@ function getEffectiveStatus(
   return 'none'
 }
 
-const ACCESS_BADGE: Record<AccessStatus, { label: string; cls: string }> = {
-  use:     { label: '已授权·使用', cls: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' },
-  view:    { label: '已授权·查看', cls: 'bg-blue-500/15 text-blue-300 border border-blue-500/30' },
-  pending: { label: '审批中',      cls: 'bg-amber-500/15 text-amber-300 border border-amber-500/30' },
-  expired: { label: '已过期',      cls: 'bg-gray-600/30 text-gray-400 border border-gray-600/30' },
-  none:    { label: '未授权',      cls: 'bg-red-500/10 text-red-400 border border-red-500/20' },
-}
-
 function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => void; onDone: () => void }) {
-  const lang = useLangStore(s => s.lang)
+  const t = useT()
   const [level, setLevel] = useState<PermissionLevel>('use')
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
@@ -84,7 +69,7 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
       await createSimRequestApi(modem.id, reason || undefined, level)
       onDone(); onClose()
     } catch (e: any) {
-      setErr(e.response?.data?.detail || '提交失败')
+      setErr(e.response?.data?.detail || t('rlib_modal_submit_failed'))
     } finally { setLoading(false) }
   }
 
@@ -97,7 +82,7 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--surface-header)' }}>
           <div>
-            <h2 className="text-base font-semibold text-white">申请权限</h2>
+            <h2 className="text-base font-semibold text-white">{t('rlib_modal_title')}</h2>
             <p className="text-xs text-blue-300/60 mt-0.5">
               {modem.alias || `SIM ${modem.id}`}{modem.operator ? ` — ${modem.operator}` : ''}
             </p>
@@ -110,9 +95,12 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
         <div className="p-6 space-y-4">
 
         <div>
-          <p className="text-xs text-blue-200/50 uppercase tracking-wider mb-2">申请权限级别</p>
+          <p className="text-xs text-blue-200/50 uppercase tracking-wider mb-2">{t('rlib_modal_level_label')}</p>
           <div className="grid grid-cols-2 gap-2">
-            {([['use', '使用权限', '可发短信 / 创建定时任务'], ['view', '仅查看', '查看设备信息，不可发送']] as const).map(([v, title, desc]) => (
+            {([
+              ['use', t('rlib_modal_level_use_title'), t('rlib_modal_level_use_desc')],
+              ['view', t('rlib_modal_level_view_title'), t('rlib_modal_level_view_desc')],
+            ] as const).map(([v, title, desc]) => (
               <button key={v} onClick={() => setLevel(v)}
                 className={clsx('p-3 rounded-xl border text-left transition-all', level === v
                   ? 'border-blue-500 bg-blue-500/15 shadow-[0_0_12px_rgba(59,130,246,0.2)]'
@@ -125,10 +113,10 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
         </div>
 
         <div>
-          <label className="block text-xs text-blue-200/50 uppercase tracking-wider mb-1.5">申请理由（可选）</label>
+          <label className="block text-xs text-blue-200/50 uppercase tracking-wider mb-1.5">{t('rlib_modal_reason_label')}</label>
           <textarea
             value={reason} onChange={e => setReason(e.target.value)} rows={2}
-            placeholder="简单说明使用用途..."
+            placeholder={t('rlib_modal_reason_ph')}
             className="w-full rounded-xl px-3 py-2 text-sm text-white resize-none focus:outline-none focus:border-blue-500/60 placeholder-gray-600"
             style={{ background: 'var(--surface-input)', border: '1px solid var(--border-input)' }}
           />
@@ -137,11 +125,11 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
         {err && <p className="text-red-400 text-xs">{err}</p>}
 
         <div className="flex gap-3 justify-end pt-1">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white">{t('rlib_modal_cancel')}</button>
           <button onClick={submit} disabled={loading}
             className="px-5 py-2 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-50"
             style={{ background: 'linear-gradient(135deg,#3b82f6,#6366f1)', boxShadow: '0 0 16px rgba(59,130,246,0.35)' }}>
-            {loading ? '提交中...' : '提交申请'}
+            {loading ? t('rlib_modal_submitting') : t('rlib_modal_submit')}
           </button>
         </div>
         </div>{/* end body */}
@@ -152,6 +140,7 @@ function ApplyModal({ modem, onClose, onDone }: { modem: Modem; onClose: () => v
 }
 
 export default function ResourceLibrary() {
+  const t = useT()
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const [modems, setModems] = useState<Modem[]>([])
@@ -162,6 +151,21 @@ export default function ResourceLibrary() {
 
   const approverScope = isAdmin ? null : getApproverScope(user?.rbac_roles ?? [])
   const roleGrantedIds = isAdmin ? new Set<number>() : getRoleGrantedIds(user?.rbac_roles ?? [])
+
+  const STATUS_CFG = {
+    connected:    { icon: Wifi,        color: 'text-emerald-400', dot: '#34d399', label: t('status_connected') },
+    disconnected: { icon: WifiOff,     color: 'text-slate-500',   dot: '#64748b', label: t('status_disconnected') },
+    error:        { icon: AlertCircle, color: 'text-red-400',     dot: '#f87171', label: t('status_error') },
+    unknown:      { icon: HelpCircle,  color: 'text-amber-400',   dot: '#fbbf24', label: t('status_unknown') },
+  } as const
+
+  const ACCESS_BADGE: Record<AccessStatus, { label: string; cls: string }> = {
+    use:     { label: t('rlib_access_use'),     cls: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' },
+    view:    { label: t('rlib_access_view'),    cls: 'bg-blue-500/15 text-blue-300 border border-blue-500/30' },
+    pending: { label: t('rlib_access_pending'), cls: 'bg-amber-500/15 text-amber-300 border border-amber-500/30' },
+    expired: { label: t('rlib_access_expired'), cls: 'bg-gray-600/30 text-gray-400 border border-gray-600/30' },
+    none:    { label: t('rlib_access_none'),    cls: 'bg-red-500/10 text-red-400 border border-red-500/20' },
+  }
 
   const load = async () => {
     setLoading(true)
@@ -183,23 +187,23 @@ export default function ResourceLibrary() {
     <div className="p-6 space-y-6 animate-fade-up">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white text-glow">SIM 资源库</h1>
-          <p className="text-sm text-blue-200/50 mt-0.5">系统中所有可用的 SIM 卡资源</p>
+          <h1 className="text-2xl font-bold text-white text-glow">{t('rlib_title')}</h1>
+          <p className="text-sm text-blue-200/50 mt-0.5">{t('rlib_subtitle')}</p>
         </div>
         <button onClick={load} disabled={loading}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-blue-300/70 hover:text-blue-200 transition-colors disabled:opacity-50"
           style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)' }}>
-          <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} /> 刷新
+          <RefreshCw className={clsx('w-4 h-4', loading && 'animate-spin')} /> {t('rlib_refresh')}
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-blue-300/40 py-16 justify-center">
-          <RefreshCw className="w-4 h-4 animate-spin" /> 加载中...
+          <RefreshCw className="w-4 h-4 animate-spin" /> {t('rlib_loading')}
         </div>
       ) : modems.length === 0 ? (
         <div className="rounded-2xl p-16 text-center border border-dashed border-blue-500/15 text-blue-300/30">
-          暂无 SIM 卡资源
+          {t('rlib_empty')}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -229,7 +233,7 @@ export default function ResourceLibrary() {
                     <h3 className="sim-card-name font-semibold text-white truncate group-hover:text-blue-200 transition-colors">
                       {m.alias || `SIM ${m.id}`}
                     </h3>
-                    <p className="sim-card-sub text-xs text-blue-200/30 mt-0.5 truncate">{m.operator || '未知运营商'}</p>
+                    <p className="sim-card-sub text-xs text-blue-200/30 mt-0.5 truncate">{m.operator || t('rlib_unknown_op')}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
                     <Icon className={`w-4 h-4 ${modemCfg.color}`} />
@@ -240,11 +244,11 @@ export default function ResourceLibrary() {
                 {/* Info */}
                 <div className="space-y-1.5 text-xs mb-3">
                   <div className="flex justify-between">
-                    <span className="sim-card-label text-blue-200/40">号码</span>
+                    <span className="sim-card-label text-blue-200/40">{t('rlib_phone_label')}</span>
                     <span className="sim-card-value text-blue-100/70">{m.phone_number || '—'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="sim-card-label text-blue-200/40">信号</span>
+                    <span className="sim-card-label text-blue-200/40">{t('rlib_signal_label')}</span>
                     <div className="flex items-end gap-0.5 h-3">
                       {[1,2,3,4,5].map(i => {
                         const bars = Math.round((m.signal_quality / 100) * 5)
@@ -263,22 +267,22 @@ export default function ResourceLibrary() {
                     <button onClick={() => setApplyTarget(m)}
                       className="sim-apply-btn text-xs px-3 py-1 rounded-lg text-blue-300 transition-all hover:text-white"
                       style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)' }}>
-                      申请权限
+                      {t('rlib_apply_btn')}
                     </button>
                   )}
                   {effectiveStatus === 'pending' && (
                     <span className="sim-status-wait flex items-center gap-1 text-xs text-amber-400/70">
-                      <Clock className="w-3 h-3" /> 等待审批
+                      <Clock className="w-3 h-3" /> {t('rlib_wait_approve')}
                     </span>
                   )}
                   {(effectiveStatus === 'use' || effectiveStatus === 'view') && (
                     <span className="sim-status-ok flex items-center gap-1 text-xs text-emerald-400/70">
-                      <CheckCircle className="w-3 h-3" /> 可使用
+                      <CheckCircle className="w-3 h-3" /> {t('rlib_can_use')}
                     </span>
                   )}
                   {isAdmin && (
                     <span className="sim-status-admin flex items-center gap-1 text-xs text-blue-400/60">
-                      <Lock className="w-3 h-3" /> 管理员
+                      <Lock className="w-3 h-3" /> {t('rlib_admin_badge')}
                     </span>
                   )}
                 </div>

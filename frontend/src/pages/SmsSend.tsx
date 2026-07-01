@@ -19,20 +19,22 @@ function TemplatePicker({
   templates,
   onSelect,
   onClose,
+  t,
 }: {
   templates: SmsTemplate[]
   onSelect: (tpl: SmsTemplate) => void
   onClose: () => void
+  t: ReturnType<typeof useT>
 }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 w-full max-w-lg space-y-3 max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">选择模板</h2>
+          <h2 className="text-lg font-bold text-white">{t('sms_tpl_picker_title')}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
         {templates.length === 0 ? (
-          <p className="text-gray-400 text-sm py-4 text-center">暂无模板</p>
+          <p className="text-gray-400 text-sm py-4 text-center">{t('sms_tpl_empty')}</p>
         ) : (
           <div className="overflow-y-auto space-y-2">
             {templates.map(tpl => (
@@ -45,7 +47,7 @@ function TemplatePicker({
                   <span className="font-medium text-white text-sm">{tpl.name}</span>
                   {tpl.variables && tpl.variables.length > 0 && (
                     <span className="text-xs text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded">
-                      {tpl.variables.length} 个变量
+                      {tpl.variables.length} {t('sms_tpl_var_count')}
                     </span>
                   )}
                 </div>
@@ -63,10 +65,12 @@ function VarFillModal({
   template,
   onConfirm,
   onClose,
+  t,
 }: {
   template: SmsTemplate
   onConfirm: (content: string) => void
   onClose: () => void
+  t: ReturnType<typeof useT>
 }) {
   const vars = template.variables && template.variables.length > 0
     ? template.variables
@@ -81,7 +85,7 @@ function VarFillModal({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 w-full max-w-lg space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">填写变量</h2>
+          <h2 className="text-lg font-bold text-white">{t('sms_var_fill_title')}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
 
@@ -92,7 +96,7 @@ function VarFillModal({
               <input
                 value={vals[v] || ''}
                 onChange={e => setVals(prev => ({ ...prev, [v]: e.target.value }))}
-                placeholder={`请输入 ${v}`}
+                placeholder={v}
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm"
               />
             </div>
@@ -100,17 +104,17 @@ function VarFillModal({
         </div>
 
         <div className="bg-gray-900 rounded-lg p-3">
-          <p className="text-xs text-gray-500 mb-1">预览</p>
+          <p className="text-xs text-gray-500 mb-1">{t('sms_preview')}</p>
           <p className="text-sm text-gray-200 whitespace-pre-wrap break-all">{preview}</p>
         </div>
 
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">{t('sms_cancel')}</button>
           <button
             onClick={() => onConfirm(preview)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm"
           >
-            使用此内容
+            {t('sms_use_content')}
           </button>
         </div>
       </div>
@@ -232,7 +236,7 @@ export default function SmsSend() {
               onClick={() => setShowPicker(true)}
               className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
             >
-              <FileText className="w-3.5 h-3.5" /> 从模板选择
+              <FileText className="w-3.5 h-3.5" /> {t('sms_from_template')}
             </button>
           </div>
           <textarea
@@ -272,6 +276,7 @@ export default function SmsSend() {
           templates={templates}
           onSelect={onPickTemplate}
           onClose={() => setShowPicker(false)}
+          t={t}
         />
       )}
       {pendingTpl && (
@@ -279,6 +284,7 @@ export default function SmsSend() {
           template={pendingTpl}
           onConfirm={text => { setContent(text); setPendingTpl(null) }}
           onClose={() => setPendingTpl(null)}
+          t={t}
         />
       )}
     </div>

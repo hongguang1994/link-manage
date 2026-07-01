@@ -11,7 +11,7 @@ import {
   type ScheduledTask, type TaskStats, type SmsMessage,
 } from '../api/sms'
 import { listUsersApi, type UserOut } from '../api/auth'
-import { useLangStore } from '../store/langStore'
+import { useT } from '../i18n'
 import { useAuthStore } from '../store/authStore'
 
 // ── Stat card ─────────────────────────────────────────────────────────────────
@@ -32,10 +32,6 @@ const STATUS_CLS: Record<string, string> = {
   paused:    'bg-yellow-900/60 text-yellow-300',
   completed: 'bg-gray-700 text-gray-400',
   failed:    'bg-red-900/60 text-red-300',
-}
-const STATUS_LABEL: Record<string, Record<string, string>> = {
-  zh: { active: '运行中', paused: '已暂停', completed: '已完成', failed: '失败' },
-  en: { active: 'Active', paused: 'Paused', completed: 'Done', failed: 'Failed' },
 }
 
 // ── History drawer ────────────────────────────────────────────────────────────
@@ -64,11 +60,18 @@ function HistoryRow({ msg }: { msg: SmsMessage }) {
 // ── Task row ──────────────────────────────────────────────────────────────────
 
 function TaskRow({
-  task, onRefresh, lang,
-}: { task: ScheduledTask; onRefresh: () => void; lang: string }) {
+  task, onRefresh, t,
+}: { task: ScheduledTask; onRefresh: () => void; t: ReturnType<typeof useT> }) {
   const [expanded, setExpanded] = useState(false)
   const [history, setHistory] = useState<SmsMessage[]>([])
   const [loadingHist, setLoadingHist] = useState(false)
+
+  const STATUS_LABEL: Record<string, string> = {
+    active: t('atask_status_active'),
+    paused: t('atask_status_paused'),
+    completed: t('atask_status_completed'),
+    failed: t('atask_status_failed'),
+  }
 
   const loadHistory = async () => {
     if (expanded) { setExpanded(false); return }
@@ -84,7 +87,7 @@ function TaskRow({
   }
 
   const remove = async () => {
-    if (!confirm(lang === 'zh' ? `确认删除任务「${task.name}」？` : `Delete task "${task.name}"?`)) return
+    if (!confirm(`${t('atask_delete_confirm')}「${task.name}」？`)) return
     await deleteTaskApi(task.id)
     onRefresh()
   }
@@ -130,7 +133,7 @@ function TaskRow({
         {/* Status */}
         <td className="px-3 py-3">
           <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', STATUS_CLS[task.status])}>
-            {STATUS_LABEL[lang]?.[task.status] ?? task.status}
+            {STATUS_LABEL[task.status] ?? task.status}
           </span>
         </td>
         {/* Recipients */}
@@ -148,18 +151,18 @@ function TaskRow({
         {/* Actions */}
         <td className="px-3 py-3">
           <div className="flex items-center gap-1.5">
-            <button onClick={runNow} title={lang === 'zh' ? '立即执行' : 'Run now'}
+            <button onClick={runNow} title={t('atask_run_now')}
               className="text-gray-400 hover:text-green-400 transition-colors">
               <Play className="w-3.5 h-3.5" />
             </button>
             {(task.status === 'active' || task.status === 'paused') && (
               <button onClick={toggle}
-                title={task.status === 'active' ? (lang === 'zh' ? '暂停' : 'Pause') : (lang === 'zh' ? '恢复' : 'Resume')}
+                title={task.status === 'active' ? t('atask_pause') : t('atask_resume')}
                 className="text-gray-400 hover:text-yellow-400 transition-colors">
                 <PauseCircle className="w-3.5 h-3.5" />
               </button>
             )}
-            <button onClick={remove} title={lang === 'zh' ? '删除' : 'Delete'}
+            <button onClick={remove} title={t('atask_delete')}
               className="text-gray-400 hover:text-red-400 transition-colors">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -172,12 +175,12 @@ function TaskRow({
         <tr>
           <td colSpan={10} className="px-6 py-3 bg-gray-900/60">
             <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">
-              {lang === 'zh' ? '最近发送记录' : 'Recent send history'}
+              {t('atask_history_title')}
             </p>
             {loadingHist ? (
-              <p className="text-xs text-gray-500">{lang === 'zh' ? '加载中…' : 'Loading…'}</p>
+              <p className="text-xs text-gray-500">{t('atask_history_loading')}</p>
             ) : history.length === 0 ? (
-              <p className="text-xs text-gray-600">{lang === 'zh' ? '暂无记录' : 'No records'}</p>
+              <p className="text-xs text-gray-600">{t('atask_history_empty')}</p>
             ) : history.map(m => <HistoryRow key={m.id} msg={m} />)}
           </td>
         </tr>
@@ -189,7 +192,7 @@ function TaskRow({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminTasks() {
-  const lang = useLangStore(s => s.lang)
+  const t = useT()
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'admin'
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
@@ -214,12 +217,10 @@ export default function AdminTasks() {
   useEffect(() => { load() }, [load])
   useEffect(() => { if (isAdmin) listUsersApi().then(r => setUsers(r.data)) }, [isAdmin])
 
-  const filtered = tasks.filter(t =>
-    !search || t.name.toLowerCase().includes(search.toLowerCase())
-      || (t.created_by_username ?? '').toLowerCase().includes(search.toLowerCase())
+  const filtered = tasks.filter(tk =>
+    !search || tk.name.toLowerCase().includes(search.toLowerCase())
+      || (tk.created_by_username ?? '').toLowerCase().includes(search.toLowerCase())
   )
-
-  const zh = lang === 'zh'
 
   return (
     <div className="p-6 space-y-5">
@@ -227,21 +228,21 @@ export default function AdminTasks() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Activity className="w-6 h-6 text-blue-400" />
-          {isAdmin ? (zh ? '定时任务监控' : 'Task Monitor') : (zh ? '我的任务记录' : 'My Tasks')}
+          {isAdmin ? t('atask_title_monitor') : t('atask_title_my')}
         </h1>
         <button onClick={load} className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors">
-          <RefreshCw className="w-4 h-4" /> {zh ? '刷新' : 'Refresh'}
+          <RefreshCw className="w-4 h-4" /> {t('atask_refresh')}
         </button>
       </div>
 
       {/* Stat cards */}
       {stats && (
         <div className="grid grid-cols-5 gap-3">
-          <StatCard label={zh ? '全部任务' : 'Total'}     value={stats.total}     color="text-white" />
-          <StatCard label={zh ? '运行中' : 'Active'}      value={stats.active}    color="text-green-400" />
-          <StatCard label={zh ? '已暂停' : 'Paused'}      value={stats.paused}    color="text-yellow-400" />
-          <StatCard label={zh ? '已完成' : 'Completed'}   value={stats.completed} color="text-gray-400" />
-          <StatCard label={zh ? '失败' : 'Failed'}        value={stats.failed}    color="text-red-400" />
+          <StatCard label={t('atask_stat_total')}     value={stats.total}     color="text-white" />
+          <StatCard label={t('atask_stat_active')}    value={stats.active}    color="text-green-400" />
+          <StatCard label={t('atask_stat_paused')}    value={stats.paused}    color="text-yellow-400" />
+          <StatCard label={t('atask_stat_completed')} value={stats.completed} color="text-gray-400" />
+          <StatCard label={t('atask_stat_failed')}    value={stats.failed}    color="text-red-400" />
         </div>
       )}
 
@@ -252,7 +253,7 @@ export default function AdminTasks() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder={zh ? '搜索任务名或创建者…' : 'Search name or creator…'}
+            placeholder={t('atask_search_ph')}
             className="bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 w-56"
           />
         </div>
@@ -262,11 +263,11 @@ export default function AdminTasks() {
           onChange={e => setFilterStatus(e.target.value)}
           className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white"
         >
-          <option value="">{zh ? '全部状态' : 'All status'}</option>
-          <option value="active">{zh ? '运行中' : 'Active'}</option>
-          <option value="paused">{zh ? '已暂停' : 'Paused'}</option>
-          <option value="completed">{zh ? '已完成' : 'Completed'}</option>
-          <option value="failed">{zh ? '失败' : 'Failed'}</option>
+          <option value="">{t('atask_filter_all_status')}</option>
+          <option value="active">{t('atask_filter_active')}</option>
+          <option value="paused">{t('atask_filter_paused')}</option>
+          <option value="completed">{t('atask_filter_completed')}</option>
+          <option value="failed">{t('atask_filter_failed')}</option>
         </select>
 
         {isAdmin && (
@@ -275,42 +276,42 @@ export default function AdminTasks() {
             onChange={e => setFilterUser(e.target.value ? Number(e.target.value) : '')}
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-white"
           >
-            <option value="">{zh ? '全部用户' : 'All users'}</option>
+            <option value="">{t('atask_filter_all_users')}</option>
             {users.map(u => <option key={u.id} value={u.id}>{u.username}</option>)}
           </select>
         )}
 
         <div className="flex items-center gap-1.5 text-xs text-gray-500 ml-auto">
           <Users className="w-3.5 h-3.5" />
-          {zh ? `共 ${filtered.length} 条任务` : `${filtered.length} tasks`}
+          {t('all')} {filtered.length} {t('atask_count')}
         </div>
       </div>
 
       {/* Table */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-gray-500 text-sm">{zh ? '加载中…' : 'Loading…'}</div>
+          <div className="p-10 text-center text-gray-500 text-sm">{t('atask_loading')}</div>
         ) : filtered.length === 0 ? (
-          <div className="p-10 text-center text-gray-500 text-sm">{zh ? '暂无任务' : 'No tasks'}</div>
+          <div className="p-10 text-center text-gray-500 text-sm">{t('atask_empty')}</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="border-b border-gray-700 text-xs text-gray-400 uppercase tracking-wider">
               <tr>
                 <th className="px-3 py-3 w-8" />
-                <th className="px-3 py-3 text-left">{zh ? '任务名称' : 'Name'}</th>
-                <th className="px-3 py-3 text-left">{zh ? '创建者' : 'Creator'}</th>
-                <th className="px-3 py-3 text-left">{zh ? '计划' : 'Schedule'}</th>
-                <th className="px-3 py-3 text-left">{zh ? '状态' : 'Status'}</th>
-                <th className="px-3 py-3 text-center">{zh ? '收件人' : 'Recipients'}</th>
-                <th className="px-3 py-3 text-center">{zh ? '执行次数' : 'Runs'}</th>
-                <th className="px-3 py-3 text-left">{zh ? '上次执行' : 'Last run'}</th>
-                <th className="px-3 py-3 text-left">{zh ? '下次执行' : 'Next run'}</th>
-                <th className="px-3 py-3 text-left">{zh ? '操作' : 'Actions'}</th>
+                <th className="px-3 py-3 text-left">{t('atask_col_name')}</th>
+                <th className="px-3 py-3 text-left">{t('atask_col_creator')}</th>
+                <th className="px-3 py-3 text-left">{t('atask_col_schedule')}</th>
+                <th className="px-3 py-3 text-left">{t('atask_col_status')}</th>
+                <th className="px-3 py-3 text-center">{t('atask_col_recipients')}</th>
+                <th className="px-3 py-3 text-center">{t('atask_col_runs')}</th>
+                <th className="px-3 py-3 text-left">{t('atask_col_last_run')}</th>
+                <th className="px-3 py-3 text-left">{t('atask_col_next_run')}</th>
+                <th className="px-3 py-3 text-left">{t('atask_col_actions')}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(task => (
-                <TaskRow key={task.id} task={task} onRefresh={load} lang={lang} />
+                <TaskRow key={task.id} task={task} onRefresh={load} t={t} />
               ))}
             </tbody>
           </table>

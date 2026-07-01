@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Search, MessageCircle, Send, Paperclip, Image, FileText, Download, Users, Clock, XCircle } from 'lucide-react'
 import clsx from 'clsx'
 import { format, isToday, isYesterday } from 'date-fns'
-import { useLangStore } from '../store/langStore'
+import { useT } from '../i18n'
 import {
   sendMessageApi, getMessagesApi, markReadApi,
   getConversationsApi, uploadFileApi,
@@ -12,32 +12,33 @@ import { listUsersApi, type UserOut } from '../api/auth'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtTime(iso: string, lang: string) {
+function fmtTime(iso: string, yesterday: string) {
   const d = new Date(iso)
   if (isToday(d)) return format(d, 'HH:mm')
-  if (isYesterday(d)) return lang === 'zh' ? `昨天 ${format(d, 'HH:mm')}` : `Yesterday ${format(d, 'HH:mm')}`
+  if (isYesterday(d)) return `${yesterday} ${format(d, 'HH:mm')}`
   return format(d, 'MM-dd HH:mm')
 }
 
 // ── Attachment picker ─────────────────────────────────────────────────────────
 
-function AttachPicker({ onPickImage, onPickFile, onClose }: {
+function AttachPicker({ onPickImage, onPickFile, onClose, labelImage, labelFile }: {
   onPickImage: () => void
   onPickFile: () => void
   onClose: () => void
+  labelImage: string
+  labelFile: string
 }) {
-  const lang = useLangStore(s => s.lang)
   return (
     <div className="absolute bottom-12 left-0 bg-gray-800 border border-gray-600 rounded-xl shadow-2xl py-1.5 z-10 min-w-[160px]">
       <button onClick={() => { onPickImage(); onClose() }}
         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-700 transition-colors">
         <Image className="w-4 h-4 text-green-400" />
-        {lang === 'zh' ? '图片' : 'Image'}
+        {labelImage}
       </button>
       <button onClick={() => { onPickFile(); onClose() }}
         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-gray-700 transition-colors">
         <FileText className="w-4 h-4 text-blue-400" />
-        {lang === 'zh' ? '文件' : 'File'}
+        {labelFile}
       </button>
     </div>
   )
@@ -87,11 +88,11 @@ function Bubble({ msg, mine }: { msg: SupportMessage; mine: boolean }) {
 
 // ── Input bar ─────────────────────────────────────────────────────────────────
 
-function InputBar({ onSend, placeholder }: {
+function InputBar({ onSend, placeholder, t }: {
   onSend: (text: string, att?: { url: string; name: string; type: string }) => Promise<void>
   placeholder: string
+  t: ReturnType<typeof useT>
 }) {
-  const lang = useLangStore(s => s.lang)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
@@ -129,7 +130,7 @@ function InputBar({ onSend, placeholder }: {
       setInput('')
       clearFile()
     } catch (e: any) {
-      alert(e.response?.data?.detail || (lang === 'zh' ? '发送失败' : 'Send failed'))
+      alert(e.response?.data?.detail || t('sup_send_fail'))
     } finally {
       setSending(false)
     }
@@ -171,7 +172,7 @@ function InputBar({ onSend, placeholder }: {
         <div className="relative">
           <button onClick={() => setShowPicker(v => !v)}
             className="w-9 h-9 flex items-center justify-center text-gray-400 hover:text-blue-400 rounded-xl hover:bg-gray-700 transition-colors"
-            title={lang === 'zh' ? '附件' : 'Attach'}>
+            title={t('sup_attach')}>
             <Paperclip className="w-4 h-4" />
           </button>
           {showPicker && (
@@ -179,6 +180,8 @@ function InputBar({ onSend, placeholder }: {
               onPickImage={() => imgRef.current?.click()}
               onPickFile={() => fileRef.current?.click()}
               onClose={() => setShowPicker(false)}
+              labelImage={t('sup_image')}
+              labelFile={t('sup_file')}
             />
           )}
         </div>
@@ -212,7 +215,7 @@ type SidebarItem = {
 }
 
 export default function SupportAdmin() {
-  const lang = useLangStore(s => s.lang)
+  const t = useT()
   const [convs, setConvs] = useState<Conversation[]>([])
   const [allUsers, setAllUsers] = useState<UserOut[]>([])
   const [selected, setSelected] = useState<{ user_id: number; username: string } | null>(null)
@@ -229,8 +232,8 @@ export default function SupportAdmin() {
   useEffect(() => {
     loadConvs()
     listUsersApi().then(r => setAllUsers(r.data.filter(u => u.role !== 'admin')))
-    const t = setInterval(loadConvs, 5000)
-    return () => clearInterval(t)
+    const timer = setInterval(loadConvs, 5000)
+    return () => clearInterval(timer)
   }, [loadConvs])
 
   // Load messages for selected user
@@ -249,8 +252,8 @@ export default function SupportAdmin() {
     if (!selected) return
     setMsgs([]); lastIdRef.current = 0
     loadMsgs(true)
-    const t = setInterval(() => loadMsgs(false), 5000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => loadMsgs(false), 5000)
+    return () => clearInterval(timer)
   }, [loadMsgs, selected])
 
   useEffect(() => {
@@ -274,10 +277,12 @@ export default function SupportAdmin() {
   const totalUnread = convs.reduce((s, c) => s + c.unread_count, 0)
 
   const FILTERS = [
-    { key: 'all' as const, label: lang === 'zh' ? '全部' : 'All' },
-    { key: 'unread' as const, label: lang === 'zh' ? '未读' : 'Unread' },
-    { key: 'replied' as const, label: lang === 'zh' ? '已回复' : 'Replied' },
+    { key: 'all' as const, label: t('sup_filter_all') },
+    { key: 'unread' as const, label: t('sup_filter_unread') },
+    { key: 'replied' as const, label: t('sup_filter_replied') },
   ]
+
+  const yesterday = t('sup_yesterday')
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
@@ -290,7 +295,7 @@ export default function SupportAdmin() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-white text-base flex items-center gap-2">
               <Users className="w-4 h-4 text-blue-400" />
-              {lang === 'zh' ? '用户咨询' : 'Support'}
+              {t('sup_title')}
             </h2>
             {totalUnread > 0 && (
               <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
@@ -305,7 +310,7 @@ export default function SupportAdmin() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder={lang === 'zh' ? '搜索用户…' : 'Search users…'}
+              placeholder={t('sup_search_ph')}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -329,7 +334,7 @@ export default function SupportAdmin() {
           {filtered.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-gray-600">
               <Users className="w-8 h-8 mb-2 opacity-30" />
-              <p className="text-xs">{lang === 'zh' ? '暂无用户' : 'No users'}</p>
+              <p className="text-xs">{t('sup_no_users')}</p>
             </div>
           )}
           {filtered.map(item => {
@@ -356,14 +361,14 @@ export default function SupportAdmin() {
                     </p>
                     {item.conv?.last_at && (
                       <span className="text-[10px] text-gray-500 shrink-0 ml-1">
-                        {fmtTime(item.conv.last_at, lang)}
+                        {fmtTime(item.conv.last_at, yesterday)}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-gray-500 truncate mt-0.5">
                     {item.conv?.last_message
                       ? item.conv.last_message
-                      : (lang === 'zh' ? '尚未发起咨询' : 'No messages yet')}
+                      : t('sup_no_init')}
                   </p>
                 </div>
                 {/* Unread badge */}
@@ -379,8 +384,8 @@ export default function SupportAdmin() {
 
         {/* Footer stats */}
         <div className="px-4 py-2.5 border-t border-gray-700 shrink-0 flex gap-4 text-xs text-gray-500">
-          <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {sidebar.length} {lang === 'zh' ? '用户' : 'users'}</span>
-          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {convs.length} {lang === 'zh' ? '会话' : 'conv'}</span>
+          <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {sidebar.length} {t('sup_users_count')}</span>
+          <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {convs.length} {t('sup_conv_count')}</span>
         </div>
       </div>
 
@@ -395,7 +400,7 @@ export default function SupportAdmin() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-white">{selected.username}</p>
-                <p className="text-xs text-gray-400">{lang === 'zh' ? '在线咨询' : 'Support chat'}</p>
+                <p className="text-xs text-gray-400">{t('sup_support_chat')}</p>
               </div>
             </div>
 
@@ -404,7 +409,7 @@ export default function SupportAdmin() {
               {msgs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-gray-600">
                   <MessageCircle className="w-10 h-10 mb-2 opacity-25" />
-                  <p className="text-sm">{lang === 'zh' ? '暂无消息' : 'No messages yet'}</p>
+                  <p className="text-sm">{t('sup_no_messages')}</p>
                 </div>
               ) : msgs.map(msg => {
                 const mine = !msg.is_from_user
@@ -423,7 +428,8 @@ export default function SupportAdmin() {
             </div>
 
             <InputBar
-              placeholder={lang === 'zh' ? `回复 ${selected.username}…` : `Reply to ${selected.username}…`}
+              placeholder={`${t('sup_reply_ph')} ${selected.username}…`}
+              t={t}
               onSend={async (text, att) => {
                 const res = await sendMessageApi({
                   content: text, user_id: selected.user_id,
@@ -438,8 +444,8 @@ export default function SupportAdmin() {
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 text-gray-600">
             <MessageCircle className="w-12 h-12 mb-3 opacity-20" />
-            <p className="text-base font-medium">{lang === 'zh' ? '选择左侧用户开始聊天' : 'Select a user to start chatting'}</p>
-            <p className="text-sm mt-1 opacity-60">{lang === 'zh' ? `共 ${sidebar.length} 个用户` : `${sidebar.length} users total`}</p>
+            <p className="text-base font-medium">{t('sup_select_user')}</p>
+            <p className="text-sm mt-1 opacity-60">{t('all')} {sidebar.length} {t('sup_total_users')}</p>
           </div>
         )}
       </div>

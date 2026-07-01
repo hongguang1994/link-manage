@@ -52,6 +52,10 @@ export const sendSmsApi = (data: { modem_id: number; phone_number: string; conte
 export const getMessagesApi = (params?: { modem_id?: number; direction?: string; skip?: number; limit?: number }) =>
   api.get<SmsMessage[]>('/sms/messages', { params })
 
+export const deleteMessageApi = (id: number) => api.delete(`/sms/messages/${id}`)
+export const batchDeleteMessagesApi = (ids: number[]) =>
+  api.post<{ deleted: number }>('/sms/messages/batch-delete', { ids })
+
 export const getTemplatesApi = () => api.get<SmsTemplate[]>('/sms/templates')
 export const createTemplateApi = (data: { name: string; content: string; variables?: string[] }) =>
   api.post<SmsTemplate>('/sms/templates', data)

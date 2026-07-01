@@ -116,7 +116,7 @@ export default function Users() {
     try {
       await changePasswordApi(pwdOld, pwdNew)
       closeModal()
-      alert(lang === 'zh' ? '密码已修改，请重新登录' : 'Password changed. Please log in again.')
+      alert(t('users_pwd_changed'))
     }
     catch (e: any) { setErr(e.response?.data?.detail || t('change_fail')) }
   }
@@ -129,7 +129,7 @@ export default function Users() {
     if (modal.type === 'create') return t('create_user_title')
     if (modal.type === 'reset_pwd') return `${t('reset_pwd_title')} — ${(modal as any).user.username}`
     if (modal.type === 'change_pwd') return t('change_pwd_title')
-    if (modal.type === 'assign_role') return `${lang === 'zh' ? '分配角色' : 'Assign Role'} — ${(modal as any).user.username}`
+    if (modal.type === 'assign_role') return `${t('users_assign_role')} — ${(modal as any).user.username}`
     return ''
   }
 
@@ -138,7 +138,7 @@ export default function Users() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">{t('users_title')}</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{users.length} {lang === 'zh' ? '个账号' : 'accounts'}</p>
+          <p className="text-sm text-gray-400 mt-0.5">{users.length} {t('users_accounts')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setModal({ type: 'change_pwd' })}
@@ -195,7 +195,7 @@ export default function Users() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       {u.role === 'user' && u.id !== me?.id && (
-                        <button onClick={() => openAssignRole(u)} title={lang === 'zh' ? '分配角色' : 'Assign Role'}
+                        <button onClick={() => openAssignRole(u)} title={t('users_assign_role')}
                           className="p-1.5 text-gray-400 hover:text-indigo-400 hover:bg-gray-700 rounded transition-colors">
                           <UserCog className="w-4 h-4" />
                         </button>
@@ -243,7 +243,7 @@ export default function Users() {
                   <input className={inputCls} value={newUsername} onChange={e => setNewUsername(e.target.value)} required autoFocus />
                 </div>
                 <div><label className={labelCls}>{t('create_password')}</label>
-                  <input className={inputCls} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required placeholder={lang === 'zh' ? '至少 6 位' : 'At least 6 chars'} />
+                  <input className={inputCls} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required placeholder={t('users_new_pwd_ph')} />
                 </div>
                 <div><label className={labelCls}>{t('create_role')}</label>
                   <select className={inputCls} value={newRole} onChange={e => setNewRole(e.target.value as any)}>
@@ -282,9 +282,7 @@ export default function Users() {
             {modal.type === 'assign_role' && (
               <div className="space-y-4">
                 <p className="text-xs text-gray-400">
-                  {lang === 'zh'
-                    ? '可同时勾选多个角色，权限取所有角色的并集。全部取消勾选则恢复独立权限设置。'
-                    : 'Select multiple roles. Permissions are the union of all selected roles. Uncheck all to revert to individual permissions.'}
+                  {t('users_role_hint')}
                 </p>
 
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
@@ -300,14 +298,14 @@ export default function Users() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-white">{roleDisplayName(r, lang)}</span>
-                            {r.read_only && <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-900/60 text-yellow-300">{lang === 'zh' ? '只读' : 'Read-only'}</span>}
-                            {r.can_support && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300">{lang === 'zh' ? '客服' : 'Support'}</span>}
+                            {r.read_only && <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-900/60 text-yellow-300">{t('users_role_readonly_badge')}</span>}
+                            {r.can_support && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-300">{t('users_role_support_badge')}</span>}
                           </div>
                           <div className="flex gap-1 mt-1.5 flex-wrap">
                             {[
-                              { label: lang === 'zh' ? '查看SIM' : 'SIM', on: r.can_view_sim },
-                              { label: lang === 'zh' ? '审批申请' : 'Approve', on: r.can_approve_requests },
-                              { label: lang === 'zh' ? '查看记录' : 'History', on: r.can_view_history },
+                              { label: t('users_perm_view_sim_s'), on: r.can_view_sim },
+                              { label: t('users_perm_approve_s'), on: r.can_approve_requests },
+                              { label: t('users_perm_history_s'), on: r.can_view_history },
                             ].map(p => (
                               <span key={p.label} className={clsx('text-[10px] px-1.5 py-0.5 rounded-full',
                                 p.on ? 'bg-green-900/50 text-green-400' : 'bg-gray-700/50 text-gray-600 line-through')}>
@@ -325,20 +323,20 @@ export default function Users() {
                   const sel = roles.filter(r => selectedRoleIds.includes(r.id))
                   return (
                     <div className="bg-gray-900/60 rounded-lg p-3 text-xs">
-                      <p className="text-gray-500 mb-1.5">{lang === 'zh' ? '合并后有效权限：' : 'Merged permissions:'}</p>
+                      <p className="text-gray-500 mb-1.5">{t('users_merged_perms')}</p>
                       <div className="flex gap-1.5 flex-wrap">
                         {[
-                          { label: lang === 'zh' ? '查看SIM' : 'View SIM', on: sel.some(r => r.can_view_sim) },
-                          { label: lang === 'zh' ? '审批申请' : 'Approve', on: sel.some(r => r.can_approve_requests) },
-                          { label: lang === 'zh' ? '查看记录' : 'History', on: sel.some(r => r.can_view_history) },
-                          { label: lang === 'zh' ? '客服' : 'Support', on: sel.some(r => r.can_support) },
+                          { label: t('users_perm_view_sim_s'), on: sel.some(r => r.can_view_sim) },
+                          { label: t('users_perm_approve_s'), on: sel.some(r => r.can_approve_requests) },
+                          { label: t('users_perm_history_s'), on: sel.some(r => r.can_view_history) },
+                          { label: t('users_perm_support_s'), on: sel.some(r => r.can_support) },
                         ].map(p => (
                           <span key={p.label} className={clsx('px-2 py-0.5 rounded-full',
                             p.on ? 'bg-green-900/60 text-green-300' : 'bg-gray-700 text-gray-500 line-through')}>
                             {p.label}
                           </span>
                         ))}
-                        {sel.every(r => r.read_only) && <span className="px-2 py-0.5 rounded-full bg-yellow-900/60 text-yellow-300">{lang === 'zh' ? '只读' : 'Read-only'}</span>}
+                        {sel.every(r => r.read_only) && <span className="px-2 py-0.5 rounded-full bg-yellow-900/60 text-yellow-300">{t('users_role_readonly_badge')}</span>}
                       </div>
                     </div>
                   )
@@ -347,9 +345,7 @@ export default function Users() {
                 <button onClick={handleAssignRole}
                   className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5">
                   <Check className="w-4 h-4" />
-                  {lang === 'zh'
-                    ? `确认分配（已选 ${selectedRoleIds.length} 个角色）`
-                    : `Confirm (${selectedRoleIds.length} role${selectedRoleIds.length !== 1 ? 's' : ''})`}
+                  {t('users_assign_confirm').replace('{n}', String(selectedRoleIds.length))}
                 </button>
               </div>
             )}

@@ -109,6 +109,55 @@ def list_messages(
     return q.order_by(SmsMessage.created_at.desc()).offset(skip).limit(limit).all()
 
 
+def _delete_from_modem(msg: SmsMessage, db: Session):
+    """If inbound, also remove the SMS object from the physical modem."""
+    if msg.direction != SmsDirection.INBOUND or msg.mm_sms_index is None:
+        return
+    modem = db.query(Modem).filter(Modem.id == msg.modem_id).first()
+    if modem:
+        modem_manager.delete_sms_from_modem(modem.mm_object_path, str(msg.mm_sms_index))
+
+
+@router.delete("/messages/{message_id}")
+def delete_message(
+    message_id: int,
+    db: Session = Depends(get_db),
+    me: User = Depends(get_current_user),
+):
+    msg = db.query(SmsMessage).filter(SmsMessage.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    visible = _user_visible_modem_ids(me, db)
+    if visible is not None and msg.modem_id not in visible:
+        raise HTTPException(status_code=403, detail="无权限")
+    _delete_from_modem(msg, db)
+    db.delete(msg)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/messages/batch-delete")
+def batch_delete_messages(
+    body: dict,
+    db: Session = Depends(get_db),
+    me: User = Depends(get_current_user),
+):
+    ids: List[int] = body.get("ids", [])
+    if not ids:
+        return {"deleted": 0}
+    visible = _user_visible_modem_ids(me, db)
+    q = db.query(SmsMessage).filter(SmsMessage.id.in_(ids))
+    if visible is not None:
+        q = q.filter(SmsMessage.modem_id.in_(visible))
+    msgs = q.all()
+    for msg in msgs:
+        _delete_from_modem(msg, db)
+    for msg in msgs:
+        db.delete(msg)
+    db.commit()
+    return {"deleted": len(msgs)}
+
+
 # ── Templates ──────────────────────────────────────────────────────────────────
 
 @router.get("/templates", response_model=List[SmsTemplateOut])

@@ -12,7 +12,9 @@ from app.core.database import SessionLocal
 from app.models.modem import Modem, ModemStatus
 from app.models.sms import SmsMessage, SmsDirection, SmsStatus
 from app.services import modem_manager
+from app.services.modem_manager import enable_modem
 from app.services.notify import push
+from app.services import telegram_bot
 # ZTE 驱动为可选依赖，导入失败时降级为仅 mmcli 模式
 try:
     from app.services import zte_http_modem as _zte
@@ -65,8 +67,16 @@ async def _poll():
             seen_paths.add(path)
             modem = db.query(Modem).filter(Modem.mm_object_path == path).first()
             if not modem:
-                modem = Modem(mm_object_path=path)
-                db.add(modem)
+                # D-Bus path changes on re-insertion; try to match by IMEI to
+                # avoid UNIQUE constraint failure and preserve history
+                imei = info.get("imei")
+                if imei:
+                    modem = db.query(Modem).filter(Modem.imei == imei).first()
+                if modem:
+                    modem.mm_object_path = path  # update to new D-Bus path
+                else:
+                    modem = Modem(mm_object_path=path)
+                    db.add(modem)
 
             modem.device_path = info.get("device_path", "")
             modem.manufacturer = info.get("manufacturer", "")
@@ -76,15 +86,34 @@ async def _poll():
             modem.operator = info.get("operator", "")
             modem.signal_quality = info.get("signal_quality", 0)
             modem.status = ModemStatus(info.get("status", "unknown"))
-            modem.phone_number = info.get("phone_number") or modem.phone_number
+            # 只在读到新号码时更新，避免 MVNO 卡（如 GiffGaff）覆盖手动填写的号码
+            if info.get("phone_number"):
+                modem.phone_number = info.get("phone_number")
             modem.access_technologies = info.get("access_technologies", "")
             modem.registration_state = info.get("registration_state", "")
             modem.tx_bytes = info.get("tx_bytes", 0)
             modem.rx_bytes = info.get("rx_bytes", 0)
             modem.connection_duration = info.get("connection_duration", 0)
+            modem.imsi = info.get("imsi") or modem.imsi
+            modem.iccid = info.get("iccid") or modem.iccid
+            modem.firmware_revision = info.get("firmware_revision") or modem.firmware_revision
+            modem.hardware_revision = info.get("hardware_revision") or modem.hardware_revision
+            modem.current_bands = info.get("current_bands") or modem.current_bands
+            modem.sim_operator_name = info.get("sim_operator_name") or modem.sim_operator_name
+            modem.sim_operator_code = info.get("sim_operator_code") or modem.sim_operator_code
+            modem.current_modes = info.get("current_modes") or modem.current_modes
+            modem.ports = info.get("ports") or modem.ports
+            modem.plugin = info.get("plugin") or modem.plugin
             modem.last_seen = datetime.utcnow()
             modem.is_active = True
             db.commit()
+
+            # Auto-enable modems stuck in "disabled" state so they can register
+            if info.get("raw_state") == "disabled" and not info["mm_object_path"].startswith("zte:"):
+                logger.info(f"Auto-enabling disabled modem {info['mm_index']}")
+                await asyncio.get_event_loop().run_in_executor(
+                    None, enable_modem, info["mm_index"]
+                )
 
             # Detect status transitions
             new_status = info.get("status", "unknown")
@@ -145,6 +174,10 @@ async def _ingest_zte_inbox(db: Session, modem: Modem):
                 received_at=datetime.utcnow(),
             )
             db.add(sms)
+            label = modem.alias or modem.model or f"设备#{modem.id}"
+            asyncio.create_task(
+                telegram_bot.push_inbound_sms(label, msg["number"], msg["text"])
+            )
     db.commit()
 
 
@@ -168,4 +201,8 @@ async def _ingest_inbox(db: Session, modem: Modem, mm_index: str):
                 received_at=datetime.utcnow(),
             )
             db.add(sms)
+            label = modem.alias or modem.model or f"设备#{modem.id}"
+            asyncio.create_task(
+                telegram_bot.push_inbound_sms(label, msg["phone_number"], msg["content"])
+            )
     db.commit()

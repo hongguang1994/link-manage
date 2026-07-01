@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SimNexus is a multi-USB 4G modem management system. It manages multiple SIM cards, handles real-time modem status monitoring via WebSocket, and provides SMS sending (manual and scheduled), SMS templates with variable substitution, RBAC-based user/role management, card-level access control (apply → approve → use), a notification system, and a support chat feature. The system runs on Debian/Ubuntu and communicates with modems through the Linux `ModemManager` daemon via the `mmcli` CLI tool. It also supports ZTE portable WiFi devices via their HTTP goform API (`services/zte_http_modem.py`).
+SimNexus is a multi-USB 4G modem management system. It manages multiple SIM cards, handles real-time modem status monitoring via WebSocket, and provides SMS sending (manual and scheduled), SMS templates with variable substitution, RBAC-based user/role management, card-level access control (apply → approve → use), a notification system, a support chat feature, and Telegram bot integration for SMS push notifications and remote commands. The system runs on Debian/Ubuntu and communicates with modems through the Linux `ModemManager` daemon via the `mmcli` CLI tool. It also supports ZTE portable WiFi devices via their HTTP goform API (`services/zte_http_modem.py`).
 
 ## Commands
 
@@ -237,8 +237,41 @@ Backend reads from environment variables or `backend/.env`:
 | `MODEM_POLL_INTERVAL` | `10` | Seconds between modem polls |
 | `SMS_SCHEDULER_INTERVAL` | `30` | (currently unused in scheduler loop) |
 | `CORS_ORIGINS` | `["http://localhost:3000","http://localhost:5173"]` | Allowed origins |
+| `TELEGRAM_BOT_TOKEN` | `""` | Telegram Bot Token（从 @BotFather 获取） |
+| `TELEGRAM_CHAT_ID` | `""` | 推送目标 Chat ID（个人或群组） |
 
 File uploads stored at `/opt/simnexus/uploads/` (UUID-named, served without auth via `GET /api/support/files/{filename}`).
+
+### Telegram Bot Integration (`app/services/telegram_bot.py`)
+
+Bot 通过长轮询（`getUpdates`）接收消息，通过 `sendMessage` / `sendPhoto` / `sendDocument` 发送消息。
+
+**启动流程**：`main.py` lifespan 中调用 `telegram_bot.start_polling()`，启动 `asyncio.Task` 运行 `_poll_loop()`。
+
+**收件推送**：`modem_poller.py` 的 `_ingest_inbox` / `_ingest_zte_inbox` 检测到新收件时，调用 `asyncio.create_task(telegram_bot.push_inbound_sms(label, sender, content))`。
+
+**Bot 命令**（`_handle_command()`）：
+
+| 命令 | 说明 |
+|------|------|
+| `/modems` | 列出所有在线设备（ID、别名、号码、运营商） |
+| `/list [#id]` | 最近 10 条收件，可按设备 ID 过滤 |
+| `/send <号码> <内容>` | 自动选择单一在线设备发送；多卡时提示指定 ID |
+| `/send #<id> <号码> <内容>` | 指定设备发送 |
+| `/help` | 显示帮助 |
+
+**REST API** (`app/api/telegram.py`)：
+
+| 端点 | 说明 |
+|------|------|
+| `GET /telegram/messages` | 消息列表（管理员） |
+| `POST /telegram/send` | 发文字消息 |
+| `POST /telegram/send-file` | 发图片/文件（multipart），自动选 sendPhoto/sendDocument |
+| `DELETE /telegram/messages` | 清空记录 |
+| `GET /telegram/config` | Bot 状态（token 是否配置、轮询是否运行） |
+| `GET /telegram/file/{file_id}` | 代理 Telegram 文件下载，JWT 通过 `?token=` 传入（同 WebSocket 模式） |
+
+**前端页面**（`/admin/telegram`，仅管理员）：聊天界面，支持收发文字、图片、文件，内联预览，点击大图，5 秒自动刷新。
 
 ### Key constraints
 

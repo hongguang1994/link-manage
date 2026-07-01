@@ -14,6 +14,7 @@ import Templates from './pages/Templates'
 import SimRequests from './pages/SimRequests'
 import MyRequests from './pages/MyRequests'
 import ResourceLibrary from './pages/ResourceLibrary'
+import TelegramAdmin from './pages/TelegramAdmin'
 import Login from './pages/Login'
 import { useAuthStore } from './store/authStore'
 
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/my-requests" element={<MyRequests />} />
           <Route path="/resources" element={<ResourceLibrary />} />
           <Route path="/admin/sim-requests" element={<RequireApprove><SimRequests /></RequireApprove>} />
+          <Route path="/admin/telegram" element={<RequireAdmin><TelegramAdmin /></RequireAdmin>} />
         </Route>
       </Routes>
     </BrowserRouter>

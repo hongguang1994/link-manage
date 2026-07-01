@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Send, Clock, MessageSquare, Cpu, CreditCard,
   Users, LogOut, Sun, Moon, Monitor, ChevronDown, User, KeyRound, X, ShieldCheck,
   Wifi, RefreshCw, ArrowUp, MessageCircle, PanelLeftClose, PanelLeftOpen,
-  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText, ClipboardCheck, Database,
+  Bell, WifiOff, AlertTriangle, UserPlus, CheckCheck, Activity, Shield, FileText, ClipboardCheck, Database, Bot,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useModemStore } from '../store/modemStore'
@@ -92,11 +92,11 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
     e.preventDefault()
     setErr('')
     if (newPwd !== confirmPwd) {
-      setErr(lang === 'zh' ? '两次密码不一致' : 'Passwords do not match')
+      setErr(t('layout_pwd_mismatch'))
       return
     }
     if (newPwd.length < 6) {
-      setErr(lang === 'zh' ? '新密码至少 6 位' : 'Password must be at least 6 characters')
+      setErr(t('layout_pwd_too_short'))
       return
     }
     setSaving(true)
@@ -104,8 +104,8 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
       await changePasswordApi(oldPwd, newPwd)
       setOk(true)
       setOldPwd(''); setNewPwd(''); setConfirmPwd('')
-    } catch (e: any) {
-      setErr(e.response?.data?.detail || t('change_fail'))
+    } catch (err: any) {
+      setErr(err.response?.data?.detail || t('change_fail'))
     } finally {
       setSaving(false)
     }
@@ -120,7 +120,7 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-700">
           <h2 className="text-lg font-semibold text-white">
-            {lang === 'zh' ? '个人信息' : 'My Profile'}
+            {t('layout_profile_title')}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors">
             <X className="w-5 h-5" />
@@ -129,7 +129,7 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
 
         {/* Tabs */}
         <div className="flex border-b border-gray-700">
-          {([['info', lang === 'zh' ? '基本信息' : 'Profile'], ['pwd', lang === 'zh' ? '修改密码' : 'Change Password']] as const).map(([id, label]) => (
+          {([['info', t('layout_profile_tab')], ['pwd', t('layout_pwd_tab')]] as const).map(([id, label]) => (
             <button key={id} onClick={() => { setTab(id); setErr(''); setOk(false) }}
               className={clsx('flex-1 py-2.5 text-sm font-medium transition-colors',
                 tab === id ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-300')}>
@@ -162,10 +162,10 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
 
               <div className="bg-gray-900/60 rounded-xl overflow-hidden">
                 {[
-                  { label: lang === 'zh' ? '用户名' : 'Username', value: user?.username },
-                  { label: lang === 'zh' ? '账号角色' : 'Role', value: user?.role === 'admin' ? t('nav_admin') : user?.rbac_roles?.length ? user.rbac_roles.map((r: any) => r.name).join(' · ') : t('nav_user') },
-                  { label: lang === 'zh' ? '账号状态' : 'Status', value: user?.is_active ? (lang === 'zh' ? '正常' : 'Active') : (lang === 'zh' ? '已禁用' : 'Disabled') },
-                  { label: lang === 'zh' ? '注册时间' : 'Created', value: user?.created_at ? fmtDate(user.created_at) : '—' },
+                  { label: t('layout_username_label'), value: user?.username },
+                  { label: t('layout_role_label'), value: user?.role === 'admin' ? t('nav_admin') : user?.rbac_roles?.length ? user.rbac_roles.map((r: any) => r.name).join(' · ') : t('nav_user') },
+                  { label: t('layout_status_label'), value: user?.is_active ? t('layout_status_active') : t('layout_status_disabled') },
+                  { label: t('layout_created_label'), value: user?.created_at ? fmtDate(user.created_at) : '—' },
                 ].map(({ label, value }, i) => (
                   <div key={i} className={clsx('flex items-center justify-between px-4 py-3 text-sm', i !== 0 && 'border-t border-gray-700/60')}>
                     <span className="text-gray-400">{label}</span>
@@ -190,20 +190,20 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
               </div>
               <div>
                 <label className="block text-xs text-gray-400 mb-1.5">
-                  {lang === 'zh' ? '确认新密码' : 'Confirm New Password'}
+                  {t('layout_confirm_pwd')}
                 </label>
                 <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)}
-                  required placeholder={lang === 'zh' ? '再次输入新密码' : 'Re-enter new password'} className={inputCls} />
+                  required placeholder={t('layout_confirm_pwd_ph')} className={inputCls} />
               </div>
 
               {err && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">{err}</p>}
               {ok && <p className="text-green-400 text-sm bg-green-400/10 border border-green-400/20 rounded-lg px-3 py-2">
-                {lang === 'zh' ? '密码已修改成功' : 'Password changed successfully'}
+                {t('layout_pwd_success')}
               </p>}
 
               <button type="submit" disabled={saving}
                 className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg py-2.5 text-sm font-medium transition-colors">
-                {saving ? (lang === 'zh' ? '修改中…' : 'Saving…') : t('change_submit')}
+                {saving ? t('layout_pwd_saving') : t('change_submit')}
               </button>
             </form>
           )}
@@ -213,6 +213,51 @@ function ProfileModal({ onClose, initialTab = "info" }: { onClose: () => void; i
   )
 }
 
+
+// ── Collapsible nav group ─────────────────────────────────────────────────────
+
+function NavGroup({
+  label, routes, sideCollapsed, children,
+}: {
+  label: string
+  routes: string[]
+  sideCollapsed: boolean
+  children: React.ReactNode
+}) {
+  const location = useLocation()
+  const isAnyActive = routes.some(r =>
+    r === '/' ? location.pathname === '/' : location.pathname.startsWith(r)
+  )
+  const [open, setOpen] = useState(isAnyActive)
+
+  // Auto-expand when navigating into this group
+  useEffect(() => {
+    if (isAnyActive) setOpen(true)
+  }, [location.pathname]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Collapsed sidebar: show items as icon strip without group header
+  if (sideCollapsed) {
+    return <div className="space-y-0.5 py-1">{children}</div>
+  }
+
+  return (
+    <div className="mb-0.5">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-medium text-blue-300/40 hover:text-blue-200/60 uppercase tracking-widest transition-colors"
+      >
+        {label}
+        <ChevronDown className={clsx('w-3 h-3 transition-transform duration-200 shrink-0', open && 'rotate-180')} />
+      </button>
+      <div
+        className="overflow-hidden transition-[max-height] duration-200 ease-in-out"
+        style={{ maxHeight: open ? '480px' : '0px' }}
+      >
+        <div className="space-y-0.5 pl-2">{children}</div>
+      </div>
+    </div>
+  )
+}
 
 // ── Floating sidebar ──────────────────────────────────────────────────────────
 
@@ -515,11 +560,11 @@ export default function Layout() {
             <div className="py-1">
               <DropdownItem onClick={() => { setProfileTab('info'); setShowProfile(true) }}>
                 <User className="w-4 h-4 text-gray-400" />
-                {lang === 'zh' ? '个人信息' : 'My Profile'}
+                {t('layout_profile')}
               </DropdownItem>
               <DropdownItem onClick={() => { setProfileTab('pwd'); setShowProfile(true) }}>
                 <KeyRound className="w-4 h-4 text-gray-400" />
-                {lang === 'zh' ? '修改密码' : 'Change Password'}
+                {t('layout_change_pwd')}
               </DropdownItem>
             </div>
 
@@ -541,91 +586,132 @@ export default function Layout() {
           'glass-strong border-r border-blue-500/10 flex flex-col py-4 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto overflow-x-hidden transition-all duration-200',
           sideCollapsed ? 'w-14 px-1' : 'w-52 px-2'
         )}>
-          <nav className="space-y-0.5 flex-1">
+          <nav className="flex-1 space-y-1">
+
+            {/* ── 总览（独立入口，不分组）─────────────────── */}
             <NavLink to="/" end className={navLinkCls} title={sideCollapsed ? t('nav_overview') : undefined}>
               <LayoutDashboard className="w-4 h-4 shrink-0" />
               {!sideCollapsed && <span>{t('nav_overview')}</span>}
             </NavLink>
-            {p.can_view_sim && (
-              <NavLink to="/resources" className={navLinkCls} title={sideCollapsed ? '资源库' : undefined}>
-                <Database className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{lang === 'zh' ? '资源库' : 'Resources'}</span>}
-              </NavLink>
+
+            {/* ── SIM 资源 ───────────────────────────────── */}
+            {(p.can_view_sim || canApprove()) && (
+              <NavGroup
+                label={t('layout_group_sim')}
+                routes={['/resources', '/sim-cards', '/admin/sim-requests']}
+                sideCollapsed={sideCollapsed}
+              >
+                {p.can_view_sim && (
+                  <NavLink to="/resources" className={navLinkCls} title={sideCollapsed ? t('layout_resources') : undefined}>
+                    <Database className="w-4 h-4 shrink-0" />
+                    {!sideCollapsed && <span>{t('layout_resources')}</span>}
+                  </NavLink>
+                )}
+                {p.can_view_sim && (
+                  <NavLink to="/sim-cards" className={navLinkCls} title={sideCollapsed ? t('nav_sim') : undefined}>
+                    <CreditCard className="w-4 h-4 shrink-0" />
+                    {!sideCollapsed && <span>{t('nav_sim')}</span>}
+                  </NavLink>
+                )}
+                {canApprove() && (
+                  <NavLink to="/admin/sim-requests" className={navLinkCls} title={sideCollapsed ? t('layout_sim_requests') : undefined}>
+                    <ClipboardCheck className="w-4 h-4 shrink-0" />
+                    {!sideCollapsed && <span>{t('layout_sim_requests')}</span>}
+                  </NavLink>
+                )}
+              </NavGroup>
             )}
-            {p.can_view_sim && (
-              <NavLink to="/sim-cards" className={navLinkCls} title={sideCollapsed ? t('nav_sim') : undefined}>
-                <CreditCard className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{t('nav_sim')}</span>}
+
+            {/* ── 短信 ───────────────────────────────────── */}
+            <NavGroup
+              label={t('layout_group_sms')}
+              routes={['/send', '/templates', '/history', '/tasks', '/admin/tasks']}
+              sideCollapsed={sideCollapsed}
+            >
+              {!p.read_only && (
+                <NavLink to="/send" className={navLinkCls} title={sideCollapsed ? t('nav_send') : undefined}>
+                  <Send className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && <span>{t('nav_send')}</span>}
+                </NavLink>
+              )}
+              {!p.read_only && (
+                <NavLink to="/templates" className={navLinkCls} title={sideCollapsed ? t('layout_templates') : undefined}>
+                  <FileText className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && <span>{t('layout_templates')}</span>}
+                </NavLink>
+              )}
+              <NavLink to="/history" className={navLinkCls} title={sideCollapsed ? t('nav_history') : undefined}>
+                <MessageSquare className="w-4 h-4 shrink-0" />
+                {!sideCollapsed && <span>{t('nav_history')}</span>}
               </NavLink>
-            )}
-            {!p.read_only && (
-              <NavLink to="/send" className={navLinkCls} title={sideCollapsed ? t('nav_send') : undefined}>
-                <Send className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{t('nav_send')}</span>}
-              </NavLink>
-            )}
-            {!p.read_only && (
-              <NavLink to="/templates" className={navLinkCls} title={sideCollapsed ? '短信模板' : undefined}>
-                <FileText className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{lang === 'zh' ? '短信模板' : 'Templates'}</span>}
-              </NavLink>
-            )}
-            <NavLink to="/history" className={navLinkCls} title={sideCollapsed ? t('nav_history') : undefined}>
-              <MessageSquare className="w-4 h-4 shrink-0" />
-              {!sideCollapsed && <span>{t('nav_history')}</span>}
-            </NavLink>
-            {!p.read_only && (
-              <NavLink to="/tasks" className={navLinkCls} title={sideCollapsed ? t('nav_tasks') : undefined}>
-                <Clock className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{t('nav_tasks')}</span>}
-              </NavLink>
-            )}
-            {user?.role === 'admin' && (
-              <NavLink to="/users" className={navLinkCls} title={sideCollapsed ? t('nav_users') : undefined}>
-                <Users className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{t('nav_users')}</span>}
-              </NavLink>
-            )}
-            {user?.role === 'admin' && (
-              <NavLink to="/roles" className={navLinkCls} title={sideCollapsed ? (lang === 'zh' ? '角色管理' : 'Roles') : undefined}>
-                <Shield className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{lang === 'zh' ? '角色管理' : 'Roles'}</span>}
-              </NavLink>
-            )}
-            {(user?.role === 'admin' || !p.read_only) && (
-              <NavLink to="/admin/tasks" className={navLinkCls} title={sideCollapsed ? t('nav_admin_tasks') : undefined}>
-                <Activity className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{user?.role === 'admin' ? t('nav_admin_tasks') : (lang === 'zh' ? '我的任务记录' : 'My Tasks')}</span>}
-              </NavLink>
-            )}
-            {canApprove() && (
-              <NavLink to="/admin/sim-requests" className={navLinkCls} title={sideCollapsed ? 'SIM申请审批' : undefined}>
-                <ClipboardCheck className="w-4 h-4 shrink-0" />
-                {!sideCollapsed && <span>{lang === 'zh' ? 'SIM申请审批' : 'SIM Requests'}</span>}
-              </NavLink>
-            )}
-            {canSupport() && (
-              <NavLink to="/support" className={navLinkCls} title={sideCollapsed ? t('nav_support') : undefined}>
-                <div className="relative shrink-0">
-                  <MessageCircle className="w-4 h-4" />
-                  {supportUnread > 0 && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-white text-[8px] font-bold flex items-center justify-center leading-none">
-                      {supportUnread > 9 ? '9' : supportUnread}
-                    </span>
+              {!p.read_only && (
+                <NavLink to="/tasks" className={navLinkCls} title={sideCollapsed ? t('nav_tasks') : undefined}>
+                  <Clock className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && <span>{t('nav_tasks')}</span>}
+                </NavLink>
+              )}
+              {(user?.role === 'admin' || !p.read_only) && (
+                <NavLink to="/admin/tasks" className={navLinkCls} title={sideCollapsed ? t('nav_admin_tasks') : undefined}>
+                  <Activity className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && (
+                    <span>{user?.role === 'admin' ? t('nav_admin_tasks') : t('layout_my_tasks')}</span>
                   )}
-                </div>
-                {!sideCollapsed && (
-                  <span className="flex-1 flex items-center justify-between">
-                    {t('nav_support')}
+                </NavLink>
+              )}
+            </NavGroup>
+
+            {/* ── 系统管理（仅管理员）──────────────────────── */}
+            {user?.role === 'admin' && (
+              <NavGroup
+                label={t('layout_group_admin')}
+                routes={['/users', '/roles', '/admin/telegram']}
+                sideCollapsed={sideCollapsed}
+              >
+                <NavLink to="/users" className={navLinkCls} title={sideCollapsed ? t('nav_users') : undefined}>
+                  <Users className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && <span>{t('nav_users')}</span>}
+                </NavLink>
+                <NavLink to="/roles" className={navLinkCls} title={sideCollapsed ? t('layout_roles') : undefined}>
+                  <Shield className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && <span>{t('layout_roles')}</span>}
+                </NavLink>
+                <NavLink to="/admin/telegram" className={navLinkCls} title={sideCollapsed ? 'Telegram' : undefined}>
+                  <Bot className="w-4 h-4 shrink-0" />
+                  {!sideCollapsed && <span>Telegram</span>}
+                </NavLink>
+              </NavGroup>
+            )}
+
+            {/* ── 客服 ───────────────────────────────────── */}
+            {canSupport() && (
+              <NavGroup
+                label={t('layout_group_support')}
+                routes={['/support']}
+                sideCollapsed={sideCollapsed}
+              >
+                <NavLink to="/support" className={navLinkCls} title={sideCollapsed ? t('nav_support') : undefined}>
+                  <div className="relative shrink-0">
+                    <MessageCircle className="w-4 h-4" />
                     {supportUnread > 0 && (
-                      <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                        {supportUnread > 99 ? '99+' : supportUnread}
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-white text-[8px] font-bold flex items-center justify-center leading-none">
+                        {supportUnread > 9 ? '9' : supportUnread}
                       </span>
                     )}
-                  </span>
-                )}
-              </NavLink>
+                  </div>
+                  {!sideCollapsed && (
+                    <span className="flex-1 flex items-center justify-between">
+                      {t('nav_support')}
+                      {supportUnread > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                          {supportUnread > 99 ? '99+' : supportUnread}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </NavLink>
+              </NavGroup>
             )}
+
           </nav>
 
           <div className={clsx('border-t border-gray-700 pt-3 mt-3', sideCollapsed ? 'px-0 flex justify-center' : 'px-3')}>
@@ -646,7 +732,7 @@ export default function Layout() {
 
 
       {/* Floating right sidebar — hidden on full-page layouts */}
-      <div className={clsx('fixed right-4 bottom-8 z-30 flex flex-col gap-2.5', ['/support', '/admin/tasks'].includes(location.pathname) && 'hidden')}>
+      <div className={clsx('fixed right-4 bottom-8 z-30 flex flex-col gap-2.5', ['/support', '/admin/tasks', '/admin/telegram'].includes(location.pathname) && 'hidden')}>
         <FloatBtn
           icon={Send}
           label={t('nav_send')}
@@ -662,21 +748,21 @@ export default function Layout() {
         />
         <FloatBtn
           icon={RefreshCw}
-          label={lang === 'zh' ? '刷新页面' : 'Reload'}
+          label={t('layout_reload')}
           onClick={() => window.location.reload()}
           color="text-yellow-400"
         />
         <div className="w-10 h-px bg-gray-700" />
         <FloatBtn
           icon={ArrowUp}
-          label={lang === 'zh' ? '回到顶部' : 'Back to top'}
+          label={t('layout_back_to_top')}
           onClick={scrollToTop}
           color="text-gray-400"
         />
         <div className="w-10 h-px bg-gray-700" />
         <FloatBtn
           icon={MessageCircle}
-          label={lang === 'zh' ? '在线咨询' : 'Support Chat'}
+          label={t('layout_online_chat')}
           onClick={() => setShowSupport(v => !v)}
           color="text-blue-400"
           badge={supportUnread}

@@ -277,6 +277,29 @@ CREATE TABLE IF NOT EXISTS support_messages (
 CREATE INDEX IF NOT EXISTS ix_support_messages_id ON support_messages (id);
 
 -- ─────────────────────────────────────────────
+-- Telegram 消息记录表
+-- direction: 'in' = 从 Telegram 收到（用户发给 bot）
+--            'out' = 从系统发出（bot 发给用户）
+-- file_type: photo | document | video | sticker | voice（媒体消息）
+-- file_id:   Telegram 文件 ID，通过 /api/telegram/file/<id> 代理下载
+-- is_command: 是否为 bot 命令（/send /list /modems /help）
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS telegram_messages (
+    id         INTEGER      NOT NULL,
+    chat_id    VARCHAR(64)  NOT NULL,   -- Telegram chat/group ID
+    username   VARCHAR(128),            -- 发送者用户名（收件时填写）
+    direction  VARCHAR(8)   NOT NULL,   -- 'in' | 'out'
+    text       TEXT         NOT NULL,   -- 消息文本（媒体消息存描述或文件名）
+    is_command BOOLEAN,                 -- 是否为 bot 命令
+    file_id    VARCHAR(256),            -- Telegram 文件 ID（媒体消息）
+    file_type  VARCHAR(32),             -- photo | document | video | sticker | voice
+    created_at DATETIME,
+    PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS ix_telegram_messages_id      ON telegram_messages (id);
+CREATE INDEX IF NOT EXISTS ix_telegram_messages_chat_id ON telegram_messages (chat_id);
+
+-- ─────────────────────────────────────────────
 -- 初始数据
 -- ─────────────────────────────────────────────
 

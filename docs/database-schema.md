@@ -2,14 +2,15 @@
 
 ## 总览
 
-SimNexus 使用 SQLite，共 8 张表，分为四个功能域：
+SimNexus 使用 SQLite，共 12 张表，分为五个功能域：
 
 | 功能域 | 表 |
 |--------|-----|
-| 用户与权限 | `users`、`roles`、`user_roles`、`user_permissions` |
-| 设备管理 | `modems` |
+| 用户与权限 | `users`、`roles`、`user_roles`、`role_modem_scope` |
+| 设备管理 | `modems`、`sim_access_requests` |
 | 短信与任务 | `sms_messages`、`sms_scheduled_tasks`、`sms_templates` |
 | 通知与客服 | `notifications`、`support_messages` |
+| Telegram 集成 | `telegram_messages` |
 
 ---
 
@@ -213,36 +214,70 @@ SimNexus 使用 SQLite，共 8 张表，分为四个功能域：
 
 ---
 
+## 五、Telegram 集成域
+
+### `telegram_messages` — Telegram 消息记录
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | INTEGER PK | 主键 |
+| chat_id | VARCHAR(64) | Telegram chat/group ID |
+| username | VARCHAR(128) | 发送者用户名（收件时填写，发件为 `SimNexus`） |
+| direction | VARCHAR(8) | `in` = bot 收到 \| `out` = bot 发出 |
+| text | TEXT | 消息文本；媒体消息存说明文字或文件名 |
+| is_command | BOOLEAN | 是否为 bot 命令（`/send`、`/list`、`/modems`、`/help`） |
+| file_id | VARCHAR(256) | Telegram 文件 ID，通过 `/api/telegram/file/<id>` 代理 |
+| file_type | VARCHAR(32) | `photo` \| `document` \| `video` \| `sticker` \| `voice` |
+| created_at | DATETIME | 入库时间 |
+
+> 此表无外键，独立存在。文件通过 Telegram Bot API 代理访问，前端携带 JWT token（`?token=`）请求 `/api/telegram/file/<file_id>`。
+
+**Bot 命令说明：**
+
+| 命令 | 功能 |
+|------|------|
+| `/modems` | 列出所有在线设备 |
+| `/list [#id]` | 查看最近 10 条收到的短信，可按设备过滤 |
+| `/send <号码> <内容>` | 通过单卡或自动选择设备发送短信 |
+| `/send #<设备ID> <号码> <内容>` | 指定设备发送短信 |
+| `/help` | 显示帮助信息 |
+
+---
+
 ## 外键关系汇总
 
 ```
-users ─────────────────────────────────────────┐
-  │ (M:N via user_roles)                        │
-  ├──► roles                                    │
-  │                                             │
-  │ (1:1, 可选)                                 │
-  ├──► user_permissions                         │
-  │                                             │
-  │ created_by_id (可选)                        │
-  ├──► sms_messages                             │
-  │                                             │
-  │ created_by_id (可选)                        │
-  ├──► sms_scheduled_tasks                      │
-  │                                             │
-  │ user_id / sender_id                         │
-  └──► support_messages                         │
-                                                │
-modems                                          │
-  ├──► sms_messages (modem_id)                  │
-  └──► sms_scheduled_tasks (modem_id)           │
-                                                │
-sms_scheduled_tasks                             │
-  └──► sms_messages (scheduled_task_id, 可选)   │
-                                                │
-notifications                                   │
-  └── target_user_id → users.id (软引用，无 FK) ┘
+users ──────────────────────────────────────────────┐
+  │ (M:N via user_roles)                             │
+  ├──► roles                                         │
+  │      └──► role_modem_scope (M:N via modems)      │
+  │                                                  │
+  │ created_by_id (可选)                             │
+  ├──► sms_messages                                  │
+  │                                                  │
+  │ created_by_id (可选)                             │
+  ├──► sms_scheduled_tasks                           │
+  │                                                  │
+  │ user_id / sender_id                              │
+  ├──► support_messages                              │
+  │                                                  │
+  │ user_id                                          │
+  └──► sim_access_requests                           │
+                                                     │
+modems                                              │
+  ├──► sms_messages (modem_id)                      │
+  ├──► sms_scheduled_tasks (modem_id)               │
+  ├──► sim_access_requests (modem_id)               │
+  └──► role_modem_scope (modem_id)                  │
+                                                     │
+sms_scheduled_tasks                                 │
+  └──► sms_messages (scheduled_task_id, 可选)        │
+                                                     │
+notifications                                       │
+  └── target_user_id → users.id (软引用，无 FK)     ┘
 
-sms_templates  （独立，无外键）
+sms_templates    （独立，无外键）
+telegram_messages（独立，无外键）
 ```
 
 ---
@@ -254,6 +289,18 @@ sms_templates  （独立，无外键）
 2. user.rbac_roles 不为空 → 合并所有角色权限
      正向权限（can_*）：any()  — 任一角色开启即生效
      read_only：all()          — 所有角色均只读才生效
-     allowed_modem_ids：union  — 取并集；任一为 null 则无限制
-3. user.rbac_roles 为空  → 回落到 user_permissions 表
+     设备范围：union(role_modem_scope) — 取并集；任一角色无 scope 则无限制
+3. user.rbac_roles 为空  → 无权限
+```
+
+## SIM 卡访问控制流程
+
+```
+用户申请 (sim_access_requests, status=pending)
+    ↓ 审批员审批
+approved → granted_level: view | use
+    ↓
+get_user_modem_grants() 查询有效授权
+    ↑
+审批员自动拥有其 role_modem_scope 内所有卡的使用权（无需申请）
 ```

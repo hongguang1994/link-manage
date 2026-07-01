@@ -38,17 +38,17 @@ def list_available_modems(db: Session = Depends(get_db), current_user=Depends(ge
     p = _perm(current_user)
     if current_user.role != UserRole.ADMIN and (not p or not p.get("can_view_sim")):
         raise HTTPException(status_code=403, detail="无SIM卡查看权限")
-    return db.query(Modem).order_by(Modem.id).all()
+    return db.query(Modem).filter(Modem.is_active == True).order_by(Modem.id).all()
 
 
 @router.get("/", response_model=List[ModemOut])
 def list_modems(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     if current_user.role == UserRole.ADMIN:
-        return db.query(Modem).order_by(Modem.id).all()
+        return db.query(Modem).filter(Modem.is_active == True).order_by(Modem.id).all()
     visible = _visible_modem_ids(current_user, db)
     if not visible:
         return []
-    return db.query(Modem).filter(Modem.id.in_(visible)).order_by(Modem.id).all()
+    return db.query(Modem).filter(Modem.id.in_(visible), Modem.is_active == True).order_by(Modem.id).all()
 
 
 @router.get("/{modem_id}", response_model=ModemOut)

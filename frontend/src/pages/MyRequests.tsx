@@ -4,15 +4,17 @@ import { CheckCircle, XCircle, Clock, RefreshCw, Plus, X, Calendar } from 'lucid
 import clsx from 'clsx'
 import { mySimRequestsApi, createSimRequestApi, type SimAccessRequest, type PermissionLevel } from '../api/simRequests'
 import { getAvailableModemsApi, type Modem } from '../api/modems'
+import { useT } from '../i18n'
 
 function StatusBadge({ status, isExpired }: { status: string; isExpired: boolean }) {
+  const t = useT()
   if (status === 'approved' && isExpired) {
-    return <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">已过期</span>
+    return <span className="inline-flex items-center gap-1 text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">{t('myreq_status_expired')}</span>
   }
   const cfg = {
-    pending:  { cls: 'text-yellow-400 bg-yellow-400/10', icon: Clock,       label: '审批中' },
-    approved: { cls: 'text-green-400 bg-green-400/10',  icon: CheckCircle,  label: '已批准' },
-    rejected: { cls: 'text-red-400 bg-red-400/10',      icon: XCircle,      label: '已拒绝' },
+    pending:  { cls: 'text-yellow-400 bg-yellow-400/10', icon: Clock,       label: t('myreq_status_pending') },
+    approved: { cls: 'text-green-400 bg-green-400/10',  icon: CheckCircle,  label: t('myreq_status_approved') },
+    rejected: { cls: 'text-red-400 bg-red-400/10',      icon: XCircle,      label: t('myreq_status_rejected') },
   }[status] ?? { cls: 'text-gray-400 bg-gray-700', icon: Clock, label: status }
   const Icon = cfg.icon
   return (
@@ -33,6 +35,7 @@ function ApplyModal({
   onClose: () => void
   onDone: () => void
 }) {
+  const t = useT()
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [reason, setReason] = useState('')
   const [requestedLevel, setRequestedLevel] = useState<PermissionLevel>('use')
@@ -57,7 +60,7 @@ function ApplyModal({
   }
 
   const submit = async () => {
-    if (selected.size === 0) { setError('请至少选择一张SIM卡'); return }
+    if (selected.size === 0) { setError(t('myreq_modal_select_one')); return }
     setLoading(true)
     setError('')
     try {
@@ -65,7 +68,7 @@ function ApplyModal({
       onDone()
       onClose()
     } catch (e: any) {
-      setError(e.response?.data?.detail || '提交失败')
+      setError(e.response?.data?.detail || t('myreq_modal_submit_failed'))
     } finally {
       setLoading(false)
     }
@@ -75,14 +78,14 @@ function ApplyModal({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center" style={{ zIndex: 9999 }} onClick={onClose}>
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">申请SIM卡使用权限</h2>
+          <h2 className="text-lg font-bold text-white">{t('myreq_modal_title')}</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
 
         <div>
-          <p className="text-sm text-gray-400 mb-2">选择要申请的SIM卡（可多选）</p>
+          <p className="text-sm text-gray-400 mb-2">{t('myreq_modal_select_label')}</p>
           {availableModems.length === 0 ? (
-            <p className="text-gray-500 text-sm py-4 text-center">所有设备均已有权限或申请中</p>
+            <p className="text-gray-500 text-sm py-4 text-center">{t('myreq_modal_no_modems')}</p>
           ) : (
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {availableModems.map(m => {
@@ -108,9 +111,9 @@ function ApplyModal({
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white font-medium">{m.alias || `SIM ${m.id}`}</p>
-                      <p className="text-xs text-gray-400">{m.operator || '未知运营商'}</p>
+                      <p className="text-xs text-gray-400">{m.operator || t('myreq_modal_unknown_op')}</p>
                     </div>
-                    {isPending && <span className="text-xs text-yellow-400">审批中</span>}
+                    {isPending && <span className="text-xs text-yellow-400">{t('myreq_modal_pending_badge')}</span>}
                   </label>
                 )
               })}
@@ -119,7 +122,7 @@ function ApplyModal({
         </div>
 
         <div>
-          <p className="text-sm text-gray-400 mb-2">申请权限级别</p>
+          <p className="text-sm text-gray-400 mb-2">{t('myreq_modal_level_label')}</p>
           <div className="flex gap-3">
             <button
               onClick={() => setRequestedLevel('use')}
@@ -127,7 +130,7 @@ function ApplyModal({
                 ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                 : 'border-gray-600 text-gray-400 hover:border-gray-500')}
             >
-              使用（发短信/定时任务）
+              {t('myreq_modal_level_use')}
             </button>
             <button
               onClick={() => setRequestedLevel('view')}
@@ -135,18 +138,18 @@ function ApplyModal({
                 ? 'border-blue-500 bg-blue-500/10 text-blue-400'
                 : 'border-gray-600 text-gray-400 hover:border-gray-500')}
             >
-              仅查看
+              {t('myreq_modal_level_view')}
             </button>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">申请理由（可选）</label>
+          <label className="block text-sm text-gray-400 mb-1">{t('myreq_modal_reason_label')}</label>
           <textarea
             value={reason}
             onChange={e => setReason(e.target.value)}
             rows={2}
-            placeholder="简单说明使用用途..."
+            placeholder={t('myreq_modal_reason_ph')}
             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm resize-none"
           />
         </div>
@@ -154,13 +157,17 @@ function ApplyModal({
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-3 justify-end">
-          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">取消</button>
+          <button onClick={onClose} className="px-4 py-2 text-gray-400 hover:text-white text-sm">{t('myreq_modal_cancel')}</button>
           <button
             onClick={submit}
             disabled={loading || selected.size === 0 || availableModems.length === 0}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg text-sm"
           >
-            {loading ? '提交中...' : `提交申请${selected.size > 0 ? `（${selected.size}张）` : ''}`}
+            {loading
+              ? t('myreq_modal_submitting')
+              : selected.size > 0
+              ? t('myreq_modal_submit_count').replace('{n}', String(selected.size))
+              : t('myreq_modal_submit')}
           </button>
         </div>
       </div>
@@ -170,6 +177,7 @@ function ApplyModal({
 }
 
 export default function MyRequests() {
+  const t = useT()
   const [requests, setRequests] = useState<SimAccessRequest[]>([])
   const [modems, setModems] = useState<Modem[]>([])
   const [loading, setLoading] = useState(true)
@@ -195,31 +203,31 @@ export default function MyRequests() {
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">我的SIM卡权限</h1>
+          <h1 className="text-2xl font-bold text-white">{t('myreq_title')}</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            有效授权 <span className="text-green-400">{activeCount}</span> 张 · 待审批 <span className="text-yellow-400">{pendingCount}</span> 张
+            {t('myreq_subtitle').replace('{active}', String(activeCount)).replace('{pending}', String(pendingCount))}
           </p>
         </div>
         <button
           onClick={() => setShowApply(true)}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm"
         >
-          <Plus className="w-4 h-4" /> 申请使用权限
+          <Plus className="w-4 h-4" /> {t('myreq_apply_btn')}
         </button>
       </div>
 
       {loading ? (
         <div className="flex items-center gap-2 text-gray-400 py-10 justify-center">
-          <RefreshCw className="w-4 h-4 animate-spin" /> 加载中...
+          <RefreshCw className="w-4 h-4 animate-spin" /> {t('myreq_loading')}
         </div>
       ) : requests.length === 0 ? (
         <div className="bg-gray-800 border border-dashed border-gray-600 rounded-xl p-12 text-center space-y-3">
-          <p className="text-gray-500">暂无申请记录</p>
+          <p className="text-gray-500">{t('myreq_empty')}</p>
           <button
             onClick={() => setShowApply(true)}
             className="text-blue-400 hover:text-blue-300 text-sm"
           >
-            立即申请 →
+            {t('myreq_apply_now')}
           </button>
         </div>
       ) : (
@@ -233,24 +241,26 @@ export default function MyRequests() {
                     <StatusBadge status={r.status} isExpired={r.is_expired} />
                     <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">
                       {r.status === 'approved' && r.granted_level
-                        ? (r.granted_level === 'use' ? '已授权使用' : '已授权查看')
-                        : (r.requested_level === 'use' ? '申请使用' : '申请查看')}
+                        ? (r.granted_level === 'use' ? t('myreq_granted_use') : t('myreq_granted_view'))
+                        : (r.requested_level === 'use' ? t('myreq_req_use') : t('myreq_req_view'))}
                     </span>
                   </div>
-                  {r.reason && <p className="text-sm text-gray-400">申请理由：{r.reason}</p>}
+                  {r.reason && <p className="text-sm text-gray-400">{t('myreq_reason_label')}{r.reason}</p>}
                   {r.admin_note && (
                     <p className="text-sm text-gray-400">
-                      管理员备注：<span className="text-gray-300">{r.admin_note}</span>
+                      {t('myreq_admin_note_label')}<span className="text-gray-300">{r.admin_note}</span>
                     </p>
                   )}
                   {r.status === 'approved' && !r.is_expired && (
                     <p className="text-xs text-gray-500 flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {r.expires_at ? `有效期至 ${r.expires_at.slice(0, 10)}` : '永久有效'}
+                      {r.expires_at
+                        ? t('myreq_valid_until').replace('{date}', r.expires_at.slice(0, 10))
+                        : t('myreq_permanent')}
                     </p>
                   )}
                   {r.is_expired && (
-                    <p className="text-xs text-red-400">已过期（{r.expires_at?.slice(0, 10)}）</p>
+                    <p className="text-xs text-red-400">{t('myreq_expired').replace('{date}', r.expires_at?.slice(0, 10) ?? '')}</p>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 shrink-0">{r.created_at?.slice(0, 10)}</p>
